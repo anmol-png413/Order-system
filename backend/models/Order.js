@@ -6,6 +6,7 @@ const orderItemSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   quantity: { type: Number, required: true, min: 1 },
   image: { type: String },
+  quantityLabel: { type: String, default: '' },
 });
 
 const orderSchema = new mongoose.Schema(
@@ -26,15 +27,11 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Auto-generate token number
+// Auto-generate token number — always increment from global max to avoid dup key errors
 orderSchema.pre('save', async function (next) {
   if (this.isNew) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const count = await mongoose.model('Order').countDocuments({
-      createdAt: { $gte: today },
-    });
-    this.tokenNumber = count + 1;
+    const last = await mongoose.model('Order').findOne({}).sort({ tokenNumber: -1 }).select('tokenNumber');
+    this.tokenNumber = (last?.tokenNumber || 0) + 1;
   }
   next();
 });

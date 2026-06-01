@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://order-system-w9a8.onrender.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }

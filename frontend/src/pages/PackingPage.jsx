@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../hooks/useSocket';
-import { Bell, CheckCircle, Loader2, Package, Clock } from 'lucide-react';
+import { Bell, CheckCircle, Loader2, Package, Clock, ShoppingCart } from 'lucide-react';
 
 const STATUS_CONFIG = {
   pending: {
@@ -43,6 +45,8 @@ function elapsed(createdAt, now) {
 }
 
 export default function PackingPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
@@ -123,6 +127,32 @@ export default function PackingPage() {
   return (
     <div className="min-h-screen bg-zinc-950">
       <Navbar title="Packing Station" subtitle="Real-time order queue" />
+
+      {/* Quick screen switcher */}
+      <div className="bg-zinc-900 border-b border-zinc-800 px-4 py-2 flex gap-2">
+        {user && (
+          <button
+            onClick={() => navigate('/staff')}
+            className="flex items-center gap-2 bg-zinc-800 hover:bg-orange-500/20 hover:text-orange-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700 hover:border-orange-500/40"
+            style={{ fontFamily: 'Sora, sans-serif' }}
+          >
+            <ShoppingCart className="w-4 h-4" /> Counter
+          </button>
+        )}
+        <button
+          className="flex items-center gap-2 bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl"
+          style={{ fontFamily: 'Sora, sans-serif' }}
+        >
+          <Package className="w-4 h-4" /> Packing
+        </button>
+        <button
+          onClick={() => navigate('/counter')}
+          className="flex items-center gap-2 bg-zinc-800 hover:bg-green-500/20 hover:text-green-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700 hover:border-green-500/40"
+          style={{ fontFamily: 'Sora, sans-serif' }}
+        >
+          <Bell className="w-4 h-4" /> Ready
+        </button>
+      </div>
 
       {/* Filter tabs */}
       <div className="sticky top-16 z-30 bg-zinc-950 border-b border-zinc-800">

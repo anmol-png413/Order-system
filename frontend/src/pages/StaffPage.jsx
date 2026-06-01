@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { Plus, Minus, Trash2, ShoppingCart, CheckCircle, X, Search, Printer } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingCart, CheckCircle, X, Search, Printer, Package, Bell } from 'lucide-react';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
@@ -54,6 +55,7 @@ function printSlip(tokenNumber, items, notes) {
 }
 
 export default function StaffPage() {
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -140,6 +142,30 @@ export default function StaffPage() {
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">
       <Navbar title="OrderFlow" subtitle="Staff — Order Taking" />
+
+      {/* Quick screen switcher */}
+      <div className="bg-zinc-900 border-b border-zinc-800 px-4 py-2 flex gap-2">
+        <button
+          className="flex items-center gap-2 bg-orange-500 text-white text-sm font-semibold px-4 py-2 rounded-xl"
+          style={{ fontFamily: 'Sora, sans-serif' }}
+        >
+          <ShoppingCart className="w-4 h-4" /> Counter
+        </button>
+        <button
+          onClick={() => navigate('/packing')}
+          className="flex items-center gap-2 bg-zinc-800 hover:bg-blue-500/20 hover:text-blue-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700 hover:border-blue-500/40"
+          style={{ fontFamily: 'Sora, sans-serif' }}
+        >
+          <Package className="w-4 h-4" /> Packing
+        </button>
+        <button
+          onClick={() => navigate('/counter')}
+          className="flex items-center gap-2 bg-zinc-800 hover:bg-green-500/20 hover:text-green-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700 hover:border-green-500/40"
+          style={{ fontFamily: 'Sora, sans-serif' }}
+        >
+          <Bell className="w-4 h-4" /> Ready
+        </button>
+      </div>
 
       {/* Success Modal */}
       {successData && (

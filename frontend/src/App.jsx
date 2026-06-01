@@ -17,7 +17,7 @@ const RoleRoute = ({ allowed, children }) => {
   if (!allowed.includes(user.role)) return <Navigate to={`/${user.role}`} replace />;
   return children;
 };
-``
+
 export default function App() {
   return (
     <AuthProvider>

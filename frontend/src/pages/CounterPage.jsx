@@ -3,7 +3,46 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import { useSocket } from '../hooks/useSocket';
-import { CheckCircle, Clock, Package, Bell } from 'lucide-react';
+import { CheckCircle, Clock, Package, Bell, Printer } from 'lucide-react';
+
+function printSlip(order) {
+  const now = new Date(order.packedAt || order.createdAt);
+  const win = window.open('', '_blank', 'width=320,height=600');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Courier New',monospace;width:290px;margin:auto;padding:12px;font-size:13px}
+    .center{text-align:center}.bold{font-weight:bold}
+    .big{font-size:28px;font-weight:900}
+    .line{border-top:1px dashed #555;margin:8px 0}
+    table{width:100%;border-collapse:collapse}
+    td{padding:3px 0;vertical-align:top}
+    .right{text-align:right}
+    .total-row td{font-weight:bold;font-size:14px;padding-top:6px}
+  </style></head><body>
+  <div class="center bold" style="font-size:18px">OrderFlow</div>
+  <div class="center" style="font-size:11px">${now.toLocaleDateString('en-IN')} &nbsp; ${now.toLocaleTimeString('en-IN')}</div>
+  <div class="line"></div>
+  <div class="center bold" style="font-size:11px;letter-spacing:2px">TOKEN NUMBER</div>
+  <div class="center big">#${order.tokenNumber}</div>
+  <div class="line"></div>
+  <table>
+    <tr><td class="bold" style="font-size:11px">ITEM</td><td class="right bold" style="font-size:11px">AMOUNT</td></tr>
+    <tr><td colspan="2"><div class="line"></div></td></tr>
+    ${order.items.map(i => `<tr>
+      <td style="font-size:12px">${i.name}${i.quantityLabel ? ' ('+i.quantityLabel+')' : ''}<br>
+        <span style="color:#666;font-size:11px">x${i.quantity} @ ₹${i.price.toFixed(2)}</span></td>
+      <td class="right">₹${(i.price * i.quantity).toFixed(2)}</td>
+    </tr>`).join('')}
+    <tr><td colspan="2"><div class="line"></div></td></tr>
+    <tr class="total-row"><td>TOTAL</td><td class="right">₹${order.totalAmount.toFixed(2)}</td></tr>
+  </table>
+  <div class="line"></div>
+  <div class="center" style="font-size:11px">✓ READY FOR PICKUP</div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 300);
+}
 
 export default function CounterPage() {
   const [orders, setOrders] = useState([]);
@@ -114,10 +153,18 @@ export default function CounterPage() {
                   </span>
                 </div>
 
-                {/* Handover indicator */}
-                <div className="mt-3 flex items-center gap-2 bg-green-500/10 rounded-xl px-3 py-2">
-                  <Bell className="w-3.5 h-3.5 text-green-400" />
-                  <span className="text-xs text-green-300 font-medium">Call Token #{order.tokenNumber}</span>
+                {/* Handover + Print */}
+                <div className="mt-3 flex gap-2">
+                  <div className="flex-1 flex items-center gap-2 bg-green-500/10 rounded-xl px-3 py-2">
+                    <Bell className="w-3.5 h-3.5 text-green-400" />
+                    <span className="text-xs text-green-300 font-medium">Call #{order.tokenNumber}</span>
+                  </div>
+                  <button
+                    onClick={() => printSlip(order)}
+                    className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium px-3 py-2 rounded-xl transition-colors"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Print
+                  </button>
                 </div>
               </div>
             ))}

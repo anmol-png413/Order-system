@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import { CheckCircle, Clock, Package, Bell, Printer, ShoppingCart } from 'lucide-react';
 
+const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
+
 function fmtUnit(item) {
   if (item.quantityLabel) return item.quantityLabel;
   if (item.unit === 'piece') return `${item.quantity} pcs`;
@@ -157,12 +159,21 @@ export default function CounterPage() {
                   <span className="badge-completed">Done</span>
                 </div>
 
-                {/* Items with unit */}
+                {/* Items with image + name + unit */}
                 <div className="space-y-1.5 mb-4">
                   {order.items.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="text-zinc-300 truncate max-w-[55%]">{item.name}</span>
-                      <span className="text-orange-400 font-semibold flex-shrink-0">{fmtUnit(item)}</span>
+                    <div key={idx} className="flex items-center gap-2">
+                      <div className="w-[30px] h-[30px] rounded-lg bg-zinc-800 overflow-hidden flex-shrink-0">
+                        <img
+                          src={item.image || IMG_FALLBACK}
+                          alt={item.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                          onError={e => { e.target.src = IMG_FALLBACK; }}
+                        />
+                      </div>
+                      <span className="text-zinc-200 text-sm truncate flex-1">{item.name}</span>
+                      <span className="text-orange-400 text-sm font-semibold flex-shrink-0">{fmtUnit(item)}</span>
                     </div>
                   ))}
                 </div>

@@ -38,7 +38,7 @@ router.get('/', protect, async (req, res) => {
       .populate('createdBy', 'name')
       .populate('packedBy', 'name')
       .sort({ createdAt: -1 })
-      .limit(req.user.role === 'admin' ? 200 : 100)
+      .limit(req.user.role === 'admin' ? 0 : 100)
       .lean();
 
     res.json(orders);
@@ -115,12 +115,35 @@ router.patch('/:id/status', protect, restrictTo('packing', 'admin'), async (req,
   }
 });
 
-// DELETE /api/orders/:id — Staff/Admin delete a completed order
+// DELETE /api/orders/bulk — Admin bulk delete (MUST be before /:id)
+router.delete('/bulk', protect, restrictTo('admin'), async (req, res) => {
+  try {
+    const { count } = req.body;
+    let deleted = 0;
+    if (count === 'all') {
+      const result = await Order.deleteMany({});
+      deleted = result.deletedCount;
+    } else {
+      const n = parseInt(count);
+      if (!n || n <= 0) return res.status(400).json({ message: 'Invalid count' });
+      const oldest = await Order.find({}).sort({ createdAt: 1 }).limit(n).select('_id').lean();
+      const ids = oldest.map(o => o._id);
+      const result = await Order.deleteMany({ _id: { $in: ids } });
+      deleted = result.deletedCount;
+    }
+    res.json({ message: `${deleted} orders deleted` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE /api/orders/:id — Admin/Staff single order delete
 router.delete('/:id', protect, restrictTo('staff', 'admin'), async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
-    if (order.status !== 'completed')
+
+    if (req.user.role === 'staff' && order.status !== 'completed')
       return res.status(400).json({ message: 'Only completed orders can be deleted' });
 
     await Order.findByIdAndDelete(req.params.id);
@@ -142,7 +165,7 @@ router.get('/stats', protect, restrictTo('admin'), async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [total, pending, inProgress, completed, revenue] = await Promise.all([
+    const [total, pending, inProgress, completed, revenue, totalRevenue] = await Promise.all([
       Order.countDocuments({ createdAt: { $gte: today } }),
       Order.countDocuments({ createdAt: { $gte: today }, status: 'pending' }),
       Order.countDocuments({ createdAt: { $gte: today }, status: 'in-progress' }),
@@ -151,11 +174,16 @@ router.get('/stats', protect, restrictTo('admin'), async (req, res) => {
         { $match: { createdAt: { $gte: today }, status: 'completed' } },
         { $group: { _id: null, total: { $sum: '$totalAmount' } } },
       ]),
+      Order.aggregate([
+        { $match: { status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
     ]);
 
     res.json({
       today: { total, pending, inProgress, completed },
       revenue: revenue[0]?.total || 0,
+      totalRevenue: totalRevenue[0]?.total || 0,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

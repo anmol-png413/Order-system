@@ -2,12 +2,18 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
-import { Plus, Edit2, Trash2, X, BarChart3, Package, Users, ShoppingBag, Upload, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, BarChart3, Package, Users, ShoppingBag, Upload, Eye, EyeOff, AlertTriangle, ClipboardList, Clock } from 'lucide-react';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
-const TABS = ['Dashboard', 'Products', 'Users'];
+const TABS = ['Dashboard', 'Products', 'Users', 'Orders'];
 const ROLES = ['staff', 'packing', 'counter', 'admin'];
+
+const STATUS_COLORS = {
+  pending: 'bg-yellow-500/15 text-yellow-400',
+  'in-progress': 'bg-blue-500/15 text-blue-400',
+  completed: 'bg-green-500/15 text-green-400',
+};
 
 export default function AdminPage() {
   const [tab, setTab] = useState('Dashboard');
@@ -24,6 +30,11 @@ export default function AdminPage() {
   const [imagePreview, setImagePreview] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Orders tab
+  const [orders, setOrders] = useState([]);
+  const [deletingOrder, setDeletingOrder] = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
+
   // Delete confirm
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
 
@@ -36,7 +47,41 @@ export default function AdminPage() {
     if (tab === 'Dashboard') fetchStats();
     if (tab === 'Products') fetchProducts();
     if (tab === 'Users') fetchUsers();
+    if (tab === 'Orders') fetchOrders();
   }, [tab]);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    try { const res = await axios.get('/api/orders'); setOrders(res.data); }
+    catch { toast.error('Failed to load orders'); }
+    finally { setLoading(false); }
+  };
+
+  const deleteOrder = async (orderId, tokenNumber) => {
+    setDeletingOrder(orderId);
+    try {
+      await axios.delete(`/api/orders/${orderId}`);
+      setOrders(prev => prev.filter(o => o._id !== orderId));
+      toast.success(`Token #${tokenNumber} deleted`);
+      fetchStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete order');
+    } finally { setDeletingOrder(null); }
+  };
+
+  const bulkDelete = async (count) => {
+    const label = count === 'all' ? 'ALL orders' : `${count} oldest orders`;
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+    setBulkLoading(true);
+    try {
+      const res = await axios.delete('/api/orders/bulk', { data: { count } });
+      toast.success(res.data.message);
+      fetchOrders();
+      fetchStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Bulk delete failed');
+    } finally { setBulkLoading(false); }
+  };
 
   const fetchStats = async () => {
     try {
@@ -140,23 +185,24 @@ export default function AdminPage() {
       <Navbar title="Admin Panel" subtitle="Manage your system" />
 
       {/* Tabs */}
-      <div className="border-b border-zinc-800 sticky top-16 z-40 bg-zinc-950">
-        <div className="max-w-7xl mx-auto px-4 flex gap-1 pt-2">
+      <div className="border-b border-zinc-800 sticky top-16 z-40 bg-zinc-950 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 flex gap-0 pt-1 min-w-max">
           {TABS.map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors min-h-[44px] ${
+              className={`flex items-center gap-1.5 px-3 sm:px-5 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors min-h-[44px] whitespace-nowrap ${
                 tab === t ? 'border-orange-500 text-orange-400' : 'border-transparent text-zinc-500 hover:text-zinc-300'
               }`} style={{ fontFamily: 'Sora, sans-serif' }}>
-              {t === 'Dashboard' && <BarChart3 className="w-4 h-4" />}
-              {t === 'Products' && <Package className="w-4 h-4" />}
-              {t === 'Users' && <Users className="w-4 h-4" />}
+              {t === 'Dashboard' && <BarChart3 className="w-3.5 h-3.5" />}
+              {t === 'Products' && <Package className="w-3.5 h-3.5" />}
+              {t === 'Users' && <Users className="w-3.5 h-3.5" />}
+              {t === 'Orders' && <ClipboardList className="w-3.5 h-3.5" />}
               {t}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
 
         {/* ── DASHBOARD TAB ── */}
         {tab === 'Dashboard' && (
@@ -164,22 +210,28 @@ export default function AdminPage() {
             <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>Today's Overview</h2>
             {stats ? (
               <>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   {[
-                    { label: 'Total Orders', value: stats.today.total, icon: ShoppingBag, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
-                    { label: 'Pending', value: stats.today.pending, icon: Package, color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
-                    { label: 'In Progress', value: stats.today.inProgress, icon: Package, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
-                    { label: 'Completed', value: stats.today.completed, icon: Package, color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
+                    { label: 'Total Orders', value: stats.today.total, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
+                    { label: 'Pending', value: stats.today.pending, color: 'text-yellow-400', bg: 'bg-yellow-500/10 border-yellow-500/20' },
+                    { label: 'In Progress', value: stats.today.inProgress, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+                    { label: 'Completed', value: stats.today.completed, color: 'text-green-400', bg: 'bg-green-500/10 border-green-500/20' },
                   ].map(s => (
-                    <div key={s.label} className={`rounded-2xl border p-5 ${s.bg}`}>
-                      <p className="text-zinc-500 text-xs uppercase tracking-wide mb-3">{s.label}</p>
-                      <p className={`text-4xl font-extrabold ${s.color}`} style={{ fontFamily: 'Sora, sans-serif' }}>{s.value}</p>
+                    <div key={s.label} className={`rounded-2xl border p-4 ${s.bg}`}>
+                      <p className="text-zinc-500 text-xs uppercase tracking-wide mb-2">{s.label}</p>
+                      <p className={`text-3xl sm:text-4xl font-extrabold ${s.color}`} style={{ fontFamily: 'Sora, sans-serif' }}>{s.value}</p>
                     </div>
                   ))}
                 </div>
-                <div className="card p-6">
-                  <p className="text-zinc-500 text-sm mb-2">Revenue Today (Completed Orders)</p>
-                  <p className="text-5xl font-extrabold text-orange-400" style={{ fontFamily: 'Sora, sans-serif' }}>₹{stats.revenue.toFixed(2)}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="card p-4 sm:p-6">
+                    <p className="text-zinc-500 text-sm mb-2">Revenue Today</p>
+                    <p className="text-2xl sm:text-4xl font-extrabold text-orange-400 break-all" style={{ fontFamily: 'Sora, sans-serif' }}>₹{stats.revenue.toFixed(2)}</p>
+                  </div>
+                  <div className="card p-4 sm:p-6 border-orange-500/30 bg-orange-500/5">
+                    <p className="text-zinc-500 text-sm mb-2">Total Revenue (All Time)</p>
+                    <p className="text-2xl sm:text-4xl font-extrabold text-orange-400 break-all" style={{ fontFamily: 'Sora, sans-serif' }}>₹{stats.totalRevenue.toFixed(2)}</p>
+                  </div>
                 </div>
                 <div className="card p-5">
                   <h3 className="font-semibold text-zinc-300 mb-1" style={{ fontFamily: 'Sora, sans-serif' }}>Quick Setup</h3>
@@ -213,7 +265,7 @@ export default function AdminPage() {
                 <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 {products.map(p => (
                   <div key={p._id} className={`card overflow-hidden ${!p.isAvailable ? 'opacity-50' : ''}`}>
                     <div className="aspect-video bg-zinc-800 overflow-hidden relative">
@@ -253,6 +305,112 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ── ORDERS TAB ── */}
+        {tab === 'Orders' && (
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>
+                All Orders
+                <span className="ml-3 text-sm font-normal text-zinc-500">{orders.length} total</span>
+              </h2>
+              <div className="flex items-center gap-2">
+                <button onClick={fetchOrders} className="btn-ghost text-sm min-h-[44px]">Refresh</button>
+                {/* Bulk delete dropdown */}
+                <div className="relative group">
+                  <button
+                    disabled={bulkLoading}
+                    className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all min-h-[44px] disabled:opacity-50"
+                    style={{ fontFamily: 'Sora, sans-serif' }}
+                  >
+                    {bulkLoading ? (
+                      <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                    Delete
+                    <span className="text-xs">▾</span>
+                  </button>
+                  {/* Dropdown */}
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+                    {[
+                      { label: 'Delete 10 orders', count: 10 },
+                      { label: 'Delete 50 orders', count: 50 },
+                      { label: 'Delete ALL orders', count: 'all' },
+                    ].map(opt => (
+                      <button key={opt.count}
+                        onClick={() => bulkDelete(opt.count)}
+                        className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-zinc-800 ${opt.count === 'all' ? 'text-red-400 font-semibold border-t border-zinc-800' : 'text-zinc-300'}`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-24">
+                <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-16 text-zinc-600">
+                <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <p>No orders today</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {orders.map(order => (
+                  <div key={order._id} className="card px-3 py-3 flex items-start gap-3">
+                    {/* Token */}
+                    <div className="w-11 h-11 bg-zinc-800 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-extrabold text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>
+                        #{order.tokenNumber}
+                      </span>
+                    </div>
+
+                    {/* Items + time */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                        {order.items.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 min-w-0">
+                            <div className="w-6 h-6 rounded-md bg-zinc-800 overflow-hidden flex-shrink-0">
+                              <img src={item.image || IMG_FALLBACK} alt={item.name} loading="lazy"
+                                className="w-full h-full object-cover"
+                                onError={e => { e.target.src = IMG_FALLBACK; }} />
+                            </div>
+                            <span className="text-zinc-300 text-xs truncate max-w-[100px]">{item.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className="text-zinc-600 text-xs flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(order.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-orange-400 text-xs font-semibold">₹{order.totalAmount?.toFixed(2)}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[order.status]}`}>
+                          {order.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Delete */}
+                    <button
+                      onClick={() => deleteOrder(order._id, order.tokenNumber)}
+                      disabled={deletingOrder === order._id}
+                      className="w-9 h-9 flex items-center justify-center bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-all flex-shrink-0 disabled:opacity-50 mt-0.5"
+                    >
+                      {deletingOrder === order._id
+                        ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                        : <Trash2 className="w-4 h-4" />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── USERS TAB ── */}
         {tab === 'Users' && (
           <div>
@@ -262,7 +420,27 @@ export default function AdminPage() {
                 <Plus className="w-4 h-4" /> Add User
               </button>
             </div>
-            <div className="card overflow-hidden">
+            {/* Mobile: cards, Desktop: table */}
+            <div className="sm:hidden space-y-2">
+              {users.map(u => (
+                <div key={u._id} className="card px-4 py-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-zinc-200 font-medium text-sm">{u.name}</p>
+                    <p className="text-zinc-500 text-xs font-mono">{u.username}</p>
+                  </div>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                    u.role === 'admin' ? 'bg-purple-500/15 text-purple-400'
+                    : u.role === 'staff' ? 'bg-orange-500/15 text-orange-400'
+                    : u.role === 'packing' ? 'bg-blue-500/15 text-blue-400'
+                    : 'bg-green-500/15 text-green-400'
+                  }`}>{u.role}</span>
+                  <button onClick={() => deleteUser(u._id)} className="text-zinc-600 hover:text-red-400 transition-colors p-1 flex-shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="hidden sm:block card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[500px]">
                   <thead>
@@ -358,7 +536,6 @@ export default function AdminPage() {
               {[
                 { label: 'Product Name', key: 'name', placeholder: 'e.g. Ladoo' },
                 { label: 'Price (₹)', key: 'price', placeholder: 'e.g. 480', type: 'number' },
-                { label: 'Category', key: 'category', placeholder: 'e.g. Counter 1, Counter 2' },
                 { label: 'Description', key: 'description', placeholder: 'Optional description' },
               ].map(f => (
                 <div key={f.key}>
@@ -369,6 +546,21 @@ export default function AdminPage() {
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-orange-500 text-sm min-h-[44px]" />
                 </div>
               ))}
+
+              {/* Category dropdown */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1 uppercase tracking-wide">Category</label>
+                <select
+                  value={productForm.category}
+                  onChange={e => setProductForm(p => ({ ...p, category: e.target.value }))}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 focus:outline-none focus:border-orange-500 text-sm min-h-[44px]"
+                >
+                  <option value="">-- Select Category --</option>
+                  <option value="Counter 1">Counter 1</option>
+                  <option value="Counter 2">Counter 2</option>
+                  <option value="Counter 3">Counter 3</option>
+                </select>
+              </div>
 
               {/* Unit Toggle */}
               <div>

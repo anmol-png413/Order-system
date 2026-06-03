@@ -109,47 +109,44 @@ export default function PackingPage() {
     <div className="min-h-screen bg-zinc-950">
       <Navbar title="Packing Area" subtitle="Real-time order queue" />
 
-      {/* Quick switcher */}
-      <div className="bg-zinc-900 border-b border-zinc-800 px-3 py-2 flex gap-2 overflow-x-auto">
-        {user && (
+      {/* Combined nav + filter tabs — single row */}
+      <div className="sticky top-16 z-30 bg-zinc-900 border-b border-zinc-800 px-3 py-2 flex items-center justify-between gap-2">
+        {/* Left: page navigation */}
+        <div className="flex gap-2 flex-shrink-0">
           <button onClick={() => navigate('/staff')}
-            className="flex-shrink-0 flex items-center gap-2 bg-zinc-800 hover:bg-orange-500/20 hover:text-orange-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700">
+            className="flex items-center gap-1.5 bg-zinc-800 hover:bg-orange-500/20 hover:text-orange-400 text-zinc-400 text-sm font-semibold px-3 py-2 rounded-xl transition-all border border-zinc-700">
             <ShoppingCart className="w-4 h-4" /> Counter
           </button>
-        )}
-        <button className="flex-shrink-0 flex items-center gap-2 bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl" style={{ fontFamily: 'Sora, sans-serif' }}>
-          <Package className="w-4 h-4" /> Packing
-        </button>
-        <button onClick={() => navigate('/counter')}
-          className="flex-shrink-0 flex items-center gap-2 bg-zinc-800 hover:bg-green-500/20 hover:text-green-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700">
-          <Bell className="w-4 h-4" /> Ready
-        </button>
-      </div>
+          <button className="flex items-center gap-1.5 bg-blue-500 text-white text-sm font-semibold px-3 py-2 rounded-xl" style={{ fontFamily: 'Sora, sans-serif' }}>
+            <Package className="w-4 h-4" /> Packing
+          </button>
+          <button onClick={() => navigate('/counter')}
+            className="flex items-center gap-1.5 bg-zinc-800 hover:bg-green-500/20 hover:text-green-400 text-zinc-400 text-sm font-semibold px-3 py-2 rounded-xl transition-all border border-zinc-700">
+            <Bell className="w-4 h-4" /> Ready
+          </button>
+        </div>
 
-      {/* Filter tabs */}
-      <div className="border-b border-zinc-800 bg-zinc-950 sticky top-16 z-30">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-1 py-2 overflow-x-auto">
-            {[
-              { key: 'all', label: 'All', count: orders.length },
-              { key: 'new', label: 'New', count: pending.length },
-              { key: 'packing', label: 'Packing', count: inProgress.length },
-            ].map(tab => (
-              <button key={tab.key} onClick={() => setFilter(tab.key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all flex-shrink-0 ${
-                  filter === tab.key ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
-                }`} style={{ fontFamily: 'Sora, sans-serif' }}>
-                {tab.label}
-                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${filter === tab.key ? 'bg-white/20 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </div>
+        {/* Right: filter tabs */}
+        <div className="flex gap-1 flex-shrink-0">
+          {[
+            { key: 'all', label: 'All', count: orders.length },
+            { key: 'new', label: 'New', count: pending.length },
+            { key: 'packing', label: 'Packing', count: inProgress.length },
+          ].map(tab => (
+            <button key={tab.key} onClick={() => setFilter(tab.key)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
+                filter === tab.key ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
+              }`} style={{ fontFamily: 'Sora, sans-serif' }}>
+              {tab.label}
+              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${filter === tab.key ? 'bg-white/20 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-4" aria-label="Packing orders">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-3" aria-label="Packing orders">
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
@@ -161,85 +158,104 @@ export default function PackingPage() {
             <p className="text-sm mt-1">New orders appear here instantly</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-0 divide-y divide-zinc-800">
             {sorted.map(order => {
               const isPending = order.status === 'pending';
+              const isInProgress = order.status === 'in-progress';
               return (
                 <div key={order._id}
-                  className={`rounded-2xl border overflow-hidden animate-slide-up ${isPending ? 'border-yellow-500/30' : 'border-blue-500/40 bg-blue-500/5'}`}>
+                  className={`flex overflow-hidden animate-slide-up ${
+                    isInProgress ? 'bg-yellow-500/5' : isPending ? 'bg-zinc-900' : 'bg-green-500/5'
+                  }`}>
 
-                  {/* Status banner */}
-                  <div className={`px-4 py-3 flex items-center justify-between ${isPending ? 'bg-yellow-500' : 'bg-blue-500'}`}>
-                    <div className="flex items-center gap-2">
-                      {isPending ? <Bell className="w-5 h-5 text-yellow-900" /> : <Loader2 className="w-5 h-5 text-white animate-spin" />}
-                      <span className={`font-bold text-base tracking-wide ${isPending ? 'text-yellow-950' : 'text-white'}`} style={{ fontFamily: 'Sora, sans-serif' }}>
-                        {isPending ? 'NEW ORDER' : 'IN PROGRESS'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className={`flex items-center gap-1 text-sm font-semibold ${isPending ? 'text-yellow-900' : 'text-white/80'}`}>
-                        <Clock className="w-4 h-4" />
-                        {elapsed(order.createdAt)}
-                      </div>
-                      <span className={`text-2xl font-extrabold ${isPending ? 'text-yellow-950' : 'text-white'}`} style={{ fontFamily: 'Sora, sans-serif' }}>
-                        #{order.tokenNumber}
-                      </span>
+                  {/* LEFT — Token + time */}
+                  <div className={`flex flex-col items-center justify-center px-2.5 py-2 min-w-[58px] flex-shrink-0 ${
+                    isInProgress ? 'bg-yellow-500' : isPending ? 'bg-zinc-800' : 'bg-green-500'
+                  }`}>
+                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isInProgress ? 'text-yellow-900' : isPending ? 'text-zinc-500' : 'text-green-900'}`}>
+                      TOKEN
+                    </span>
+                    <span className={`text-2xl font-black leading-none ${isInProgress ? 'text-yellow-950' : isPending ? 'text-white' : 'text-green-950'}`}
+                      style={{ fontFamily: 'Sora, sans-serif' }}>
+                      {order.tokenNumber}
+                    </span>
+                    <div className={`flex items-center gap-0.5 text-[9px] font-semibold mt-0.5 ${isInProgress ? 'text-yellow-800' : isPending ? 'text-zinc-500' : 'text-green-800'}`}>
+                      <Clock className="w-2.5 h-2.5" />
+                      {elapsed(order.createdAt)}
                     </div>
                   </div>
 
-                  {/* Items — big grid like staff page */}
-                  <div className="p-4">
-                    <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {/* RIGHT — Status + items + action */}
+                  <div className="flex-1 min-w-0">
+                    {/* Status header row */}
+                    <div className={`flex items-center justify-between px-3 py-1.5 border-b ${
+                      isInProgress ? 'border-yellow-500/30 bg-yellow-500/10'
+                      : isPending ? 'border-zinc-800 bg-zinc-800/50'
+                      : 'border-green-500/20 bg-green-500/10'
+                    }`}>
+                      <div className="flex items-center gap-1.5">
+                        {isInProgress
+                          ? <Loader2 className="w-3 h-3 text-yellow-400 animate-spin" />
+                          : isPending
+                            ? <Bell className="w-3 h-3 text-zinc-400" />
+                            : <CheckCircle className="w-3 h-3 text-green-400" />}
+                        <span className={`text-[11px] font-bold tracking-wide ${
+                          isInProgress ? 'text-yellow-300' : isPending ? 'text-zinc-300' : 'text-green-300'
+                        }`}>
+                          {isInProgress ? 'IN PROGRESS' : isPending ? 'PENDING' : 'DONE'}
+                        </span>
+                      </div>
+
+                      {/* Action button */}
+                      {canUpdate ? (
+                        <button
+                          onClick={() => updateStatus(order)}
+                          disabled={updating === order._id}
+                          className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all active:scale-95 disabled:opacity-50 ${
+                            isPending
+                              ? 'bg-blue-500 hover:bg-blue-400 text-white'
+                              : isInProgress
+                                ? 'bg-green-500 hover:bg-green-400 text-white'
+                                : 'bg-zinc-700 text-zinc-400'
+                          }`}
+                        >
+                          {updating === order._id
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : isPending
+                              ? <><Package className="w-3 h-3" /> TAP TO START</>
+                              : isInProgress
+                                ? <><CheckCircle className="w-3 h-3" /> TAP TO FINISH</>
+                                : 'COMPLETED'
+                          }
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-zinc-600 font-medium">View only</span>
+                      )}
+                    </div>
+
+                    {/* Products horizontal scroll */}
+                    <div className="flex gap-2 px-3 py-2 overflow-x-auto">
                       {order.items.map((item, idx) => (
-                        <div key={idx} className="flex flex-col items-center gap-2">
-                          <div className="w-full aspect-square rounded-xl bg-zinc-800 overflow-hidden">
+                        <div key={idx} className="flex flex-col items-center flex-shrink-0 w-16">
+                          <div className="w-16 h-16 rounded-xl bg-zinc-800 overflow-hidden mb-1">
                             <img
                               src={item.image || IMG_FALLBACK}
                               alt={item.name}
                               loading="lazy"
-                              width="120" height="120"
+                              width="48" height="48"
                               className="w-full h-full object-cover"
                               onError={e => { e.target.src = IMG_FALLBACK; }}
                             />
                           </div>
-                          <div className="text-center w-full">
-                            <p className="text-zinc-200 text-xs font-semibold leading-tight line-clamp-2">{item.name}</p>
-                            <p className="text-orange-400 text-sm font-bold mt-0.5">{fmtUnit(item)}</p>
-                          </div>
+                          <p className="text-zinc-200 text-[11px] font-semibold text-center leading-tight line-clamp-2 w-full">{item.name}</p>
+                          <p className="text-orange-400 text-[11px] font-bold mt-0.5">{fmtUnit(item)}</p>
                         </div>
                       ))}
                     </div>
 
                     {order.notes && (
-                      <div className="mt-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl px-3 py-2">
+                      <div className="mx-3 mb-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-2.5 py-1.5">
                         <p className="text-xs text-yellow-300">📝 {order.notes}</p>
-                      </div>
-                    )}
-
-                    {/* Action Button — only packing/admin can update */}
-                    {canUpdate ? (
-                      <button
-                        onClick={() => updateStatus(order)}
-                        disabled={updating === order._id}
-                        aria-label={isPending ? `Start packing order #${order.tokenNumber}` : `Mark order #${order.tokenNumber} complete`}
-                        className={`w-full mt-4 py-4 rounded-xl font-bold text-base flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-60 ${
-                          isPending
-                            ? 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-900/30'
-                            : 'bg-green-500 hover:bg-green-400 text-white shadow-lg shadow-green-900/30'
-                        }`}
-                        style={{ fontFamily: 'Sora, sans-serif', minHeight: '56px' }}
-                      >
-                        {updating === order._id
-                          ? <Loader2 className="w-6 h-6 animate-spin" />
-                          : isPending
-                            ? <><Package className="w-6 h-6" /> Start Packing</>
-                            : <><CheckCircle className="w-6 h-6" /> Mark Complete</>
-                        }
-                      </button>
-                    ) : (
-                      <div className="w-full mt-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-500 text-sm font-medium text-center"
-                        style={{ fontFamily: 'Sora, sans-serif' }}>
-                        👁 View only
                       </div>
                     )}
                   </div>

@@ -153,9 +153,14 @@ function StatusModal({ type, orders, onClose, onDelete, deleting }) {
                   )}
                   <div className="space-y-1.5">
                     {order.items.map((item, i) => (
-                      <div key={i} className="flex justify-between text-sm">
-                        <span className="text-zinc-300 truncate">{item.name}</span>
-                        <span className="text-zinc-500 ml-2 flex-shrink-0">
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="w-[30px] h-[30px] rounded-lg bg-zinc-800 overflow-hidden flex-shrink-0">
+                          <img src={item.image || IMG_FALLBACK} alt={item.name} loading="lazy"
+                            className="w-full h-full object-cover"
+                            onError={e => { e.target.src = IMG_FALLBACK; }} />
+                        </div>
+                        <span className="text-zinc-300 text-sm truncate flex-1">{item.name}</span>
+                        <span className="text-zinc-500 text-sm flex-shrink-0">
                           {item.quantityLabel || (item.unit === 'piece' ? `${item.quantity} pcs` : `${item.quantity} kg`)}
                         </span>
                       </div>
@@ -194,9 +199,22 @@ export default function StaffPage() {
   // Live orders for status modals
   const [liveOrders, setLiveOrders] = useState([]);
   const [deleting, setDeleting] = useState(null);
+  const [showFloating, setShowFloating] = useState(true);
 
   const fetchLiveOrders = useCallback(() => {
     axios.get('/api/orders').then(res => setLiveOrders(res.data)).catch(() => {});
+  }, []);
+
+  // Hide floating buttons on scroll, show when scroll stops
+  useEffect(() => {
+    let timer;
+    const onScroll = () => {
+      setShowFloating(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => setShowFloating(true), 800);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => { window.removeEventListener('scroll', onScroll); clearTimeout(timer); };
   }, []);
 
   useEffect(() => {
@@ -258,7 +276,7 @@ export default function StaffPage() {
 
     if (isKg) {
       const kg = parseWeightToKg(modalWeight);
-      if (!kg || kg <= 0) { toast.error('Sahi weight daalo (e.g. 500g, 1kg)'); return; }
+      if (!kg || kg <= 0) { toast.error('Enter a valid weight (e.g. 500g, 1kg)'); return; }
       const calculatedPrice = parseFloat((modalProduct.price * kg).toFixed(2));
       const label = modalWeight.trim().toLowerCase().endsWith('g') || modalWeight.trim().toLowerCase().endsWith('kg')
         ? modalWeight.trim()
@@ -307,7 +325,12 @@ export default function StaffPage() {
     setPlacing(true);
     try {
       const res = await axios.post('/api/orders', { items: cart, notes });
-      setSuccessData({ token: res.data.tokenNumber, items: [...cart], notes });
+      const orderData = { token: res.data.tokenNumber, items: [...cart], notes };
+      setSuccessData(orderData);
+      // Auto print slip immediately on order placement
+      setTimeout(() => printSlip(orderData.token, orderData.items, orderData.notes), 300);
+      // Auto close success modal after 3.5 seconds
+      setTimeout(() => setSuccessData(null), 3500);
       setCart([]);
       setNotes('');
       setCartOpen(false);
@@ -411,13 +434,33 @@ export default function StaffPage() {
                 /* ── KG product: weight input with live price ── */
                 <div className="mb-5">
                   <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wide">
-                    Weight daalo
-                    <span className="normal-case text-zinc-600 ml-1">(e.g. 500g, 250g, 1kg, 1.5kg)</span>
+                    Enter Weight
+                    <span className="normal-case text-zinc-600 ml-1">(or select below)</span>
                   </label>
+
+                  {/* Quick weight buttons */}
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    {['150g', '500g', '1kg', '2kg'].map(w => (
+                      <button
+                        key={w}
+                        type="button"
+                        onClick={() => setModalWeight(w)}
+                        className={`py-2 rounded-xl text-sm font-bold transition-all ${
+                          modalWeight === w
+                            ? 'bg-orange-500 text-white shadow-lg shadow-orange-900/30'
+                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'
+                        }`}
+                        style={{ fontFamily: 'Sora, sans-serif' }}
+                      >
+                        {w}
+                      </button>
+                    ))}
+                  </div>
+
                   <input
                     value={modalWeight}
                     onChange={e => setModalWeight(e.target.value)}
-                    placeholder="e.g. 500g"
+                    placeholder="Or type: e.g. 250g"
                     autoFocus
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-lg focus:outline-none focus:border-orange-500"
                   />
@@ -434,7 +477,7 @@ export default function StaffPage() {
               ) : (
                 /* ── PIECE product: quantity counter ── */
                 <div className="flex items-center justify-between mb-5">
-                  <span className="text-zinc-400 text-sm font-medium">Kitne piece?</span>
+                  <span className="text-zinc-400 text-sm font-medium">Quantity</span>
                   <div className="flex items-center gap-3 bg-zinc-800 rounded-xl p-1">
                     <button onClick={() => setModalQty(q => Math.max(1, q - 1))} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300">
                       <Minus className="w-4 h-4" />
@@ -450,7 +493,7 @@ export default function StaffPage() {
               <button onClick={addFromModal} className="w-full btn-primary py-4 flex items-center justify-center gap-2 text-base">
                 <ShoppingCart className="w-5 h-5" />
                 {modalProduct.unit !== 'piece'
-                  ? `Add — ${parseWeightToKg(modalWeight) ? `₹${(modalProduct.price * parseWeightToKg(modalWeight)).toFixed(2)}` : 'weight daalo'}`
+                  ? `Add — ${parseWeightToKg(modalWeight) ? `₹${(modalProduct.price * parseWeightToKg(modalWeight)).toFixed(2)}` : 'enter weight'}`
                   : `Add to Cart — ₹${(modalProduct.price * modalQty).toFixed(2)}`}
               </button>
             </div>
@@ -638,8 +681,10 @@ export default function StaffPage() {
       {/* </main> */}
       </div>
 
-      {/* ── FLOATING STATUS BUTTON (desktop) ── */}
-      <div className="hidden sm:flex fixed bottom-6 right-6 z-30 flex-col gap-2">
+      {/* ── FLOATING STATUS BUTTONS (left side, hide on scroll) ── */}
+      <div className={`hidden sm:flex fixed bottom-6 left-6 z-30 flex-col gap-2 transition-all duration-300 ${
+        showFloating ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'
+      }`}>
         <button onClick={() => setStatusModal('counter')}
           className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white rounded-xl px-4 py-3 shadow-xl transition-all active:scale-95">
           <Bell className="w-5 h-5" />

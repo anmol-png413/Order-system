@@ -35,8 +35,8 @@ export default function App() {
             <Route path="/cart" element={<CartPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/staff" element={<RoleRoute allowed={['staff', 'admin']}><StaffPage /></RoleRoute>} />
-            <Route path="/packing" element={<PackingPage />} />
-            <Route path="/counter" element={<CounterPage />} />
+            <Route path="/packing" element={<RoleRoute allowed={['packing', 'admin', 'staff', 'counter']}><PackingPage /></RoleRoute>} />
+            <Route path="/counter" element={<RoleRoute allowed={['counter', 'admin', 'staff', 'packing']}><CounterPage /></RoleRoute>} />
             <Route path="/admin" element={<RoleRoute allowed={['admin']}><AdminPage /></RoleRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

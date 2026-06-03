@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
 // POST /api/products — Admin only
 router.post('/', protect, restrictTo('admin'), upload.single('image'), async (req, res) => {
   try {
-    const { name, price, category, description, isAvailable, sortOrder } = req.body;
+    const { name, price, category, description, isAvailable, sortOrder, unit } = req.body;
     const product = await Product.create({
       name,
       price: parseFloat(price),
@@ -67,6 +67,7 @@ router.post('/', protect, restrictTo('admin'), upload.single('image'), async (re
       description,
       isAvailable: isAvailable !== 'false',
       sortOrder: parseInt(sortOrder) || 0,
+      unit: unit || 'kg',
       image: req.file ? req.file.path : '',
     });
     res.status(201).json(product);
@@ -78,11 +79,12 @@ router.post('/', protect, restrictTo('admin'), upload.single('image'), async (re
 // PUT /api/products/:id — Admin only
 router.put('/:id', protect, restrictTo('admin'), upload.single('image'), async (req, res) => {
   try {
-    const { name, price, category, description, isAvailable, sortOrder } = req.body;
+    const { name, price, category, description, isAvailable, sortOrder, unit } = req.body;
     const updateData = {
       name, price: parseFloat(price), category, description,
       isAvailable: isAvailable !== 'false',
       sortOrder: parseInt(sortOrder) || 0,
+      unit: unit || 'kg',
     };
     if (req.file) updateData.image = req.file.path;
 

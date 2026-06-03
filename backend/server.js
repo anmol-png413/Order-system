@@ -56,11 +56,32 @@ io.on('connection', (socket) => {
   });
 });
 
+// Sync token counter with the highest existing tokenNumber in DB
+async function syncTokenCounter() {
+  const Counter = require('./models/Counter');
+  const Order = require('./models/Order');
+  const lastOrder = await Order.findOne({}, { tokenNumber: 1 }).sort({ tokenNumber: -1 }).lean();
+  const maxToken = lastOrder?.tokenNumber || 0;
+  const counter = await Counter.findOne({ _id: 'tokenNumber' });
+  if (!counter) {
+    await Counter.create({ _id: 'tokenNumber', seq: maxToken });
+    console.log(`Token counter initialized at ${maxToken}`);
+  } else if (counter.seq < maxToken) {
+    await Counter.updateOne({ _id: 'tokenNumber' }, { $set: { seq: maxToken } });
+    console.log(`Token counter synced to ${maxToken}`);
+  }
+}
+
 // MongoDB connection
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
+  .connect(process.env.MONGO_URI, {
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+  })
+  .then(async () => {
     console.log('MongoDB connected');
+    await syncTokenCounter();
     server.listen(process.env.PORT || 5000, () => {
       console.log(`Server running on port ${process.env.PORT || 5000}`);
     });

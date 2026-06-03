@@ -35,11 +35,11 @@ router.get('/', protect, async (req, res) => {
     }
 
     const orders = await Order.find(filter)
-      .populate('items.product', 'name image')
       .populate('createdBy', 'name')
       .populate('packedBy', 'name')
       .sort({ createdAt: -1 })
-      .limit(req.user.role === 'admin' ? 200 : 100);
+      .limit(req.user.role === 'admin' ? 200 : 100)
+      .lean();
 
     res.json(orders);
   } catch (err) {
@@ -110,6 +110,27 @@ router.patch('/:id/status', protect, restrictTo('packing', 'admin'), async (req,
     req.io.to('staff').emit('order-updated', order);
 
     res.json(order);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE /api/orders/:id — Staff/Admin delete a completed order
+router.delete('/:id', protect, restrictTo('staff', 'admin'), async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (order.status !== 'completed')
+      return res.status(400).json({ message: 'Only completed orders can be deleted' });
+
+    await Order.findByIdAndDelete(req.params.id);
+
+    req.io.to('packing').emit('order-deleted', { _id: req.params.id });
+    req.io.to('counter').emit('order-deleted', { _id: req.params.id });
+    req.io.to('admin').emit('order-deleted', { _id: req.params.id });
+    req.io.to('staff').emit('order-deleted', { _id: req.params.id });
+
+    res.json({ message: 'Order deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

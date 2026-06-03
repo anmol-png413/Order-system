@@ -9,16 +9,25 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
-const io = new Server(server, {
-  cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    methods: ['GET', 'POST'],
-    credentials: true,
+// Support multiple origins from comma-separated CLIENT_URL env var
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim());
+
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error('Not allowed by CORS'));
   },
+  credentials: true,
+};
+
+const io = new Server(server, {
+  cors: { origin: allowedOrigins, methods: ['GET', 'POST'], credentials: true },
 });
 
 // Middleware
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173', credentials: true }));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -47,11 +56,32 @@ io.on('connection', (socket) => {
   });
 });
 
+// Sync token counter with the highest existing tokenNumber in DB
+async function syncTokenCounter() {
+  const Counter = require('./models/Counter');
+  const Order = require('./models/Order');
+  const lastOrder = await Order.findOne({}, { tokenNumber: 1 }).sort({ tokenNumber: -1 }).lean();
+  const maxToken = lastOrder?.tokenNumber || 0;
+  const counter = await Counter.findOne({ _id: 'tokenNumber' });
+  if (!counter) {
+    await Counter.create({ _id: 'tokenNumber', seq: maxToken });
+    console.log(`Token counter initialized at ${maxToken}`);
+  } else if (counter.seq < maxToken) {
+    await Counter.updateOne({ _id: 'tokenNumber' }, { $set: { seq: maxToken } });
+    console.log(`Token counter synced to ${maxToken}`);
+  }
+}
+
 // MongoDB connection
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
+  .connect(process.env.MONGO_URI, {
+    maxPoolSize: 10,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+  })
+  .then(async () => {
     console.log('MongoDB connected');
+    await syncTokenCounter();
     server.listen(process.env.PORT || 5000, () => {
       console.log(`Server running on port ${process.env.PORT || 5000}`);
     });

@@ -21,10 +21,10 @@ export default function Navbar({ title, subtitle }) {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-zinc-950/90 backdrop-blur border-b border-zinc-800">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 bg-zinc-950/90 backdrop-blur border-b border-zinc-800" role="banner">
+      <nav className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4" aria-label="Main navigation">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 bg-orange-500 rounded-xl flex items-center justify-center flex-shrink-0" aria-hidden="true">
             <ShoppingBag className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
           <div>
@@ -36,20 +36,25 @@ export default function Navbar({ title, subtitle }) {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5">
-            <User className="w-3.5 h-3.5 text-zinc-500" />
-            <span className="text-sm text-zinc-300">{user?.name}</span>
-            <span className={`text-xs font-semibold uppercase tracking-wide ${ROLE_COLORS[user?.role]}`}>
-              {user?.role}
-            </span>
-          </div>
-          <button onClick={handleLogout}
-            className="flex items-center gap-1.5 text-zinc-500 hover:text-red-400 transition-colors text-sm px-3 py-2 rounded-xl hover:bg-red-500/10">
-            <LogOut className="w-4 h-4" />
+          {user && (
+            <div className="hidden sm:flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5" aria-label={`Logged in as ${user.name}, role: ${user.role}`}>
+              <User className="w-3.5 h-3.5 text-zinc-500" aria-hidden="true" />
+              <span className="text-sm text-zinc-300">{user.name}</span>
+              <span className={`text-xs font-semibold uppercase tracking-wide ${ROLE_COLORS[user.role]}`}>
+                {user.role}
+              </span>
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            aria-label="Logout"
+            className="flex items-center gap-1.5 text-zinc-500 hover:text-red-400 transition-colors text-sm px-3 py-2 rounded-xl hover:bg-red-500/10"
+          >
+            <LogOut className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
-      </div>
+      </nav>
     </header>
   );
 }

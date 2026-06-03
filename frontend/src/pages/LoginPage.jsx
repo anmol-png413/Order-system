@@ -50,13 +50,15 @@ export default function LoginPage() {
             Sign in to your account
           </h2>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate autoComplete="off">
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wide">
+              <label htmlFor="username" className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wide">
                 Username
               </label>
               <input
+                id="username"
                 type="text"
+                autoComplete="off"
                 value={form.username}
                 onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
                 placeholder="Enter username"
@@ -66,12 +68,14 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wide">
+              <label htmlFor="password" className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wide">
                 Password
               </label>
               <div className="relative">
                 <input
+                  id="password"
                   type={showPass ? 'text' : 'password'}
+                  autoComplete="off"
                   value={form.password}
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="Enter password"
@@ -79,8 +83,9 @@ export default function LoginPage() {
                   required
                 />
                 <button type="button" onClick={() => setShowPass(s => !s)}
+                  aria-label={showPass ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPass ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                 </button>
               </div>
             </div>
@@ -99,10 +104,15 @@ export default function LoginPage() {
           <div className="mt-6 pt-5 border-t border-zinc-800">
             <p className="text-xs text-zinc-600 text-center">Demo accounts (after seeding)</p>
             <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs text-zinc-500">
-              {[['admin','admin123'],['staff1','staff123'],['packer1','packer123'],['counter1','counter123']].map(([u,p]) => (
-                <button key={u} onClick={() => setForm({ username: u, password: p })}
+              {[
+                ['admin',          'admin',    'admin123'],
+                ['Order Counter',  'staff1',   'staff123'],
+                ['Packing',        'packer1',  'packer123'],
+                ['Pickup Counter', 'counter1', 'counter123'],
+              ].map(([label, u, p]) => (
+                <button key={label} onClick={() => setForm({ username: u, password: p })}
                   className="text-left bg-zinc-800/60 hover:bg-zinc-800 rounded-lg px-3 py-1.5 transition-colors">
-                  <span className="text-orange-400 font-medium">{u}</span>
+                  <span className="text-orange-400 font-medium">{label}</span>
                 </button>
               ))}
             </div>

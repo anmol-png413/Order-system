@@ -1,24 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const jwt = require('jsonwebtoken');
 const Product = require('../models/Product');
 const User = require('../models/User');
 const { protect, restrictTo } = require('../middleware/auth');
 
-// Multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../uploads/products');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `product-${Date.now()}${path.extname(file.originalname)}`);
+// Cloudinary config
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// Multer → Cloudinary storage
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'order-system/products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 800, height: 800, crop: 'limit', quality: 'auto' }],
   },
 });
+
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -53,7 +59,7 @@ router.get('/', async (req, res) => {
 // POST /api/products — Admin only
 router.post('/', protect, restrictTo('admin'), upload.single('image'), async (req, res) => {
   try {
-    const { name, price, category, description, isAvailable, sortOrder } = req.body;
+    const { name, price, category, description, isAvailable, sortOrder, unit } = req.body;
     const product = await Product.create({
       name,
       price: parseFloat(price),
@@ -61,7 +67,8 @@ router.post('/', protect, restrictTo('admin'), upload.single('image'), async (re
       description,
       isAvailable: isAvailable !== 'false',
       sortOrder: parseInt(sortOrder) || 0,
-      image: req.file ? `/uploads/products/${req.file.filename}` : '',
+      unit: unit || 'kg',
+      image: req.file ? req.file.path : '',
     });
     res.status(201).json(product);
   } catch (err) {
@@ -72,13 +79,14 @@ router.post('/', protect, restrictTo('admin'), upload.single('image'), async (re
 // PUT /api/products/:id — Admin only
 router.put('/:id', protect, restrictTo('admin'), upload.single('image'), async (req, res) => {
   try {
-    const { name, price, category, description, isAvailable, sortOrder } = req.body;
+    const { name, price, category, description, isAvailable, sortOrder, unit } = req.body;
     const updateData = {
       name, price: parseFloat(price), category, description,
       isAvailable: isAvailable !== 'false',
       sortOrder: parseInt(sortOrder) || 0,
+      unit: unit || 'kg',
     };
-    if (req.file) updateData.image = `/uploads/products/${req.file.filename}`;
+    if (req.file) updateData.image = req.file.path;
 
     const product = await Product.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!product) return res.status(404).json({ message: 'Product not found' });

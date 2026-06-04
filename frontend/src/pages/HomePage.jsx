@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { ShoppingCart, Plus, Minus, X, ShoppingBag } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" fill="%231a1a1a"/><text x="60" y="68" text-anchor="middle" font-size="40" fill="%23444">🍽️</text></svg>';
@@ -39,10 +39,10 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center shadow-lg shadow-orange-900/40">
-              <ShoppingBag className="w-4 h-4 text-white" strokeWidth={2.5} />
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-white flex-shrink-0">
+              <img src="/image.png" alt="Green Sweets" className="w-full h-full object-contain" />
             </div>
-            <span className="font-bold text-white text-lg" style={{ fontFamily: 'Sora, sans-serif' }}>OrderFlow</span>
+            <span className="font-bold text-white text-lg" style={{ fontFamily: 'Sora, sans-serif' }}>Green Sweets</span>
           </div>
           <button
             onClick={() => navigate('/cart')}

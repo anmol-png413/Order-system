@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { ShoppingBag, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -35,11 +35,11 @@ export default function LoginPage() {
       <div className="relative w-full max-w-sm animate-slide-up">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-500 rounded-2xl mb-5 shadow-2xl shadow-orange-900/50">
-            <ShoppingBag className="w-8 h-8 text-white" strokeWidth={2.5} />
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-full mb-5 shadow-2xl overflow-hidden bg-white">
+            <img src="/image.png" alt="Green Sweets" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>
-            OrderFlow
+            Green Sweets
           </h1>
           <p className="text-zinc-500 mt-1 text-sm">Smart Order Management System</p>
         </div>

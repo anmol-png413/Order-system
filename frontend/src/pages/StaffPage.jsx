@@ -28,11 +28,10 @@ function fmtQty(quantity, quantityLabel, unit) {
   return `${quantity} kg`;
 }
 
-function printSlip(tokenNumber, items, notes) {
+function buildSlipHTML(tokenNumber, items, notes) {
   const now = new Date();
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const win = window.open('', '_blank', 'width=320,height=640');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Courier New',monospace;width:290px;margin:auto;padding:12px;font-size:13px}
@@ -65,9 +64,26 @@ function printSlip(tokenNumber, items, notes) {
   ${notes ? `<div class="line"></div><div style="font-size:11px">Note: ${notes}</div>` : ''}
   <div class="line"></div>
   <div class="center" style="font-size:12px;font-weight:bold">Thank you! Visit again ✓</div>
-  </body></html>`);
+  </body></html>`;
+}
+
+function writeAndPrint(win, html) {
+  win.document.write(html);
   win.document.close();
-  setTimeout(() => win.print(), 300);
+  win.focus();
+  setTimeout(() => {
+    win.print();
+    // Close after print dialog closes, or after 3s fallback
+    win.onafterprint = () => win.close();
+    setTimeout(() => { if (!win.closed) win.close(); }, 3000);
+  }, 300);
+}
+
+function printSlip(tokenNumber, items, notes) {
+  const html = buildSlipHTML(tokenNumber, items, notes);
+  const win = window.open('', '_blank', 'width=320,height=640');
+  if (!win) return;
+  writeAndPrint(win, html);
 }
 
 // ── Live Status Modal ────────────────────────────────────────────
@@ -205,13 +221,12 @@ export default function StaffPage() {
     axios.get('/api/orders').then(res => setLiveOrders(res.data)).catch(() => {});
   }, []);
 
-  // Hide floating buttons on scroll, show when scroll stops
   useEffect(() => {
     let timer;
     const onScroll = () => {
       setShowFloating(false);
       clearTimeout(timer);
-      timer = setTimeout(() => setShowFloating(true), 800);
+      timer = setTimeout(() => setShowFloating(true), 4000);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => { window.removeEventListener('scroll', onScroll); clearTimeout(timer); };
@@ -323,18 +338,22 @@ export default function StaffPage() {
   const placeOrder = async () => {
     if (cart.length === 0) return;
     setPlacing(true);
+    // Open print window SYNCHRONOUSLY here (direct user gesture) — required for iOS Safari
+    const printWin = window.open('', '_blank', 'width=320,height=640');
     try {
       const res = await axios.post('/api/orders', { items: cart, notes });
       const orderData = { token: res.data.tokenNumber, items: [...cart], notes };
       setSuccessData(orderData);
-      // Auto print slip immediately on order placement
-      setTimeout(() => printSlip(orderData.token, orderData.items, orderData.notes), 300);
-      // Auto close success modal after 3.5 seconds
-      setTimeout(() => setSuccessData(null), 3500);
+      setTimeout(() => setSuccessData(null), 2000);
+      // Write content to already-opened window and print
+      if (printWin && !printWin.closed) {
+        writeAndPrint(printWin, buildSlipHTML(orderData.token, orderData.items, orderData.notes));
+      }
       setCart([]);
       setNotes('');
       setCartOpen(false);
     } catch (err) {
+      if (printWin && !printWin.closed) printWin.close();
       toast.error(err.response?.data?.message || 'Failed to place order');
     } finally {
       setPlacing(false);
@@ -350,12 +369,12 @@ export default function StaffPage() {
         <button className="flex-shrink-0 flex items-center gap-2 bg-orange-500 text-white text-sm font-semibold px-4 py-2 rounded-xl" style={{ fontFamily: 'Sora, sans-serif' }}>
           <ShoppingCart className="w-4 h-4" /> Counter
         </button>
-        <button onClick={() => navigate('/packing')}
+        <button onClick={() => setStatusModal('packing')}
           className="flex-shrink-0 flex items-center gap-2 bg-zinc-800 hover:bg-blue-500/20 hover:text-blue-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700">
           <Package className="w-4 h-4" /> Packing
           {packingCount > 0 && <span className="bg-blue-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{packingCount}</span>}
         </button>
-        <button onClick={() => navigate('/counter')}
+        <button onClick={() => setStatusModal('counter')}
           className="flex-shrink-0 flex items-center gap-2 bg-zinc-800 hover:bg-green-500/20 hover:text-green-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700">
           <Bell className="w-4 h-4" /> Ready
           {readyCount > 0 && <span className="bg-green-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{readyCount}</span>}
@@ -415,48 +434,54 @@ export default function StaffPage() {
 
       {/* ── PRODUCT MODAL ── */}
       {modalProduct && (
-        <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={() => setModalProduct(null)}>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
-            <div className="aspect-video bg-zinc-800 relative">
-              <img src={modalProduct.image || IMG_FALLBACK} alt={modalProduct.name}
-                className="w-full h-full object-cover" onError={e => { e.target.src = IMG_FALLBACK; }} />
-              <button onClick={() => setModalProduct(null)} aria-label="Close" className="absolute top-3 right-3 w-9 h-9 bg-black/60 rounded-full flex items-center justify-center text-white">
-                <X className="w-4 h-4" aria-hidden="true" />
+        <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-start justify-center px-4 pb-4 pt-20 overflow-y-auto" onClick={() => setModalProduct(null)}>
+          <div
+            className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm flex flex-col animate-slide-up relative"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header bar with X button - always visible above image */}
+            <div className="flex items-center justify-end px-3 py-2 flex-shrink-0 rounded-t-2xl bg-zinc-900">
+              <button
+                onClick={() => setModalProduct(null)}
+                className="w-9 h-9 bg-zinc-800 hover:bg-zinc-700 rounded-full flex items-center justify-center text-zinc-300 hover:text-white transition-all"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-5">
-              <h3 className="font-bold text-white text-xl mb-0.5" style={{ fontFamily: 'Sora, sans-serif' }}>{modalProduct.name}</h3>
+
+            {/* Image - full, no crop */}
+            <div className="w-full bg-zinc-800 flex-shrink-0">
+              <img
+                src={modalProduct.image || IMG_FALLBACK}
+                alt={modalProduct.name}
+                className="w-full object-contain"
+                style={{ maxHeight: '180px' }}
+                onError={e => { e.target.src = IMG_FALLBACK; }}
+              />
+            </div>
+
+            {/* Scrollable content */}
+            <div className="overflow-y-auto flex-1 p-4 pr-4">
+              <h3 className="font-bold text-white text-xl mb-0.5 pr-8" style={{ fontFamily: 'Sora, sans-serif' }}>{modalProduct.name}</h3>
               <p className="text-zinc-500 text-sm mb-4">
                 ₹{modalProduct.price.toFixed(2)} / {modalProduct.unit === 'piece' ? 'piece' : 'kg'}
               </p>
 
               {modalProduct.unit !== 'piece' ? (
-                /* ── KG product: weight input with live price ── */
-                <div className="mb-5">
+                <div className="mb-2">
                   <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wide">
-                    Enter Weight
-                    <span className="normal-case text-zinc-600 ml-1">(or select below)</span>
+                    Enter Weight <span className="normal-case text-zinc-600">(or select below)</span>
                   </label>
-
-                  {/* Quick weight buttons */}
                   <div className="grid grid-cols-4 gap-2 mb-3">
                     {['150g', '500g', '1kg', '2kg'].map(w => (
-                      <button
-                        key={w}
-                        type="button"
-                        onClick={() => setModalWeight(w)}
+                      <button key={w} type="button" onClick={() => setModalWeight(w)}
                         className={`py-2 rounded-xl text-sm font-bold transition-all ${
-                          modalWeight === w
-                            ? 'bg-orange-500 text-white shadow-lg shadow-orange-900/30'
-                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'
-                        }`}
-                        style={{ fontFamily: 'Sora, sans-serif' }}
-                      >
+                          modalWeight === w ? 'bg-orange-500 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'
+                        }`} style={{ fontFamily: 'Sora, sans-serif' }}>
                         {w}
                       </button>
                     ))}
                   </div>
-
                   <input
                     value={modalWeight}
                     onChange={e => setModalWeight(e.target.value)}
@@ -464,19 +489,9 @@ export default function StaffPage() {
                     autoFocus
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-lg focus:outline-none focus:border-orange-500"
                   />
-                  {/* Live price preview */}
-                  <div className="mt-3 bg-zinc-800 rounded-xl px-4 py-3 flex items-center justify-between">
-                    <span className="text-zinc-400 text-sm">Price</span>
-                    <span className="text-2xl font-extrabold text-orange-400" style={{ fontFamily: 'Sora, sans-serif' }}>
-                      {parseWeightToKg(modalWeight)
-                        ? `₹${(modalProduct.price * parseWeightToKg(modalWeight)).toFixed(2)}`
-                        : '—'}
-                    </span>
-                  </div>
                 </div>
               ) : (
-                /* ── PIECE product: quantity counter ── */
-                <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center justify-between mb-2">
                   <span className="text-zinc-400 text-sm font-medium">Quantity</span>
                   <div className="flex items-center gap-3 bg-zinc-800 rounded-xl p-1">
                     <button onClick={() => setModalQty(q => Math.max(1, q - 1))} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300">
@@ -489,7 +504,10 @@ export default function StaffPage() {
                   </div>
                 </div>
               )}
+            </div>
 
+            {/* Fixed Add to Cart button */}
+            <div className="p-4 border-t border-zinc-800 flex-shrink-0">
               <button onClick={addFromModal} className="w-full btn-primary py-4 flex items-center justify-center gap-2 text-base">
                 <ShoppingCart className="w-5 h-5" />
                 {modalProduct.unit !== 'piece'
@@ -681,7 +699,7 @@ export default function StaffPage() {
       {/* </main> */}
       </div>
 
-      {/* ── FLOATING STATUS BUTTONS (left side, hide on scroll) ── */}
+      {/* ── FLOATING STATUS BUTTONS (left side, show after 4s idle) ── */}
       <div className={`hidden sm:flex fixed bottom-6 left-6 z-30 flex-col gap-2 transition-all duration-300 ${
         showFloating ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'
       }`}>

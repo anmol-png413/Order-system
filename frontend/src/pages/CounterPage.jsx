@@ -60,8 +60,9 @@ export default function CounterPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchOrders = useCallback(() => {
-    axios.get('/api/orders').then(res => setOrders(res.data))
-      .catch(() => toast.error('Failed to load orders'))
+    axios.get('/api/orders').then(res =>
+      setOrders(res.data.filter(o => o.status === 'completed'))
+    ).catch(() => toast.error('Failed to load orders'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -89,6 +90,7 @@ export default function CounterPage() {
   });
 
   const timeSince = (date) => {
+    if (!date) return 'Just now';
     const mins = Math.floor((Date.now() - new Date(date)) / 60000);
     if (mins < 1) return 'Just now';
     if (mins < 60) return `${mins}m ago`;

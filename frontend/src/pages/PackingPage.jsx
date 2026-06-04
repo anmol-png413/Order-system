@@ -23,6 +23,7 @@ export default function PackingPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
   const [filter, setFilter] = useState('all');
+  const [navView, setNavView] = useState('packing'); // 'packing' | 'ready'
   const [now, setNow] = useState(Date.now());
 
   // Live timer
@@ -41,8 +42,7 @@ export default function PackingPage() {
 
   const fetchOrders = useCallback(() => {
     axios.get('/api/orders').then(res => {
-      // Only show pending and in-progress
-      setOrders(res.data.filter(o => o.status !== 'completed'));
+      setOrders(res.data);
     }).catch(() => toast.error('Failed to fetch orders'))
       .finally(() => setLoading(false));
   }, []);
@@ -64,8 +64,7 @@ export default function PackingPage() {
     },
     'order-updated': (updated) => {
       if (updated.status === 'completed') {
-        // Auto-remove completed orders
-        setOrders(prev => prev.filter(o => o._id !== updated._id));
+        setOrders(prev => prev.map(o => o._id === updated._id ? updated : o));
         toast.success(`Token #${updated.tokenNumber} ready for pickup!`, { icon: '✅' });
       } else {
         setOrders(prev => prev.map(o => o._id === updated._id ? updated : o));
@@ -80,12 +79,8 @@ export default function PackingPage() {
     setUpdating(order._id);
     try {
       await axios.patch(`/api/orders/${order._id}/status`, { status: newStatus });
-      if (newStatus === 'completed') {
-        setOrders(prev => prev.filter(o => o._id !== order._id));
-        toast.success(`Token #${order.tokenNumber} marked complete!`);
-      } else {
-        setOrders(prev => prev.map(o => o._id === order._id ? { ...o, status: newStatus } : o));
-      }
+      setOrders(prev => prev.map(o => o._id === order._id ? { ...o, status: newStatus } : o));
+      if (newStatus === 'completed') toast.success(`Token #${order.tokenNumber} marked complete!`);
     } catch {
       toast.error('Failed to update status');
     } finally {
@@ -95,54 +90,69 @@ export default function PackingPage() {
 
   const pending = orders.filter(o => o.status === 'pending');
   const inProgress = orders.filter(o => o.status === 'in-progress');
+  const completed = orders.filter(o => o.status === 'completed');
 
   const displayed = filter === 'all' ? orders
     : filter === 'new' ? pending
-    : inProgress;
+    : filter === 'packing' ? inProgress
+    : completed;
 
   const sorted = [...displayed].sort((a, b) => {
-    const ord = { 'in-progress': 0, pending: 1 };
-    return (ord[a.status] ?? 2) - (ord[b.status] ?? 2);
+    const ord = { 'in-progress': 0, pending: 1, completed: 2 };
+    return (ord[a.status] ?? 3) - (ord[b.status] ?? 3);
   });
 
   return (
     <div className="min-h-screen bg-zinc-950">
       <Navbar title="Packing Area" subtitle="Real-time order queue" />
 
-      {/* Combined nav + filter tabs — single row */}
-      <div className="sticky top-16 z-30 bg-zinc-900 border-b border-zinc-800 px-3 py-2 flex items-center justify-between gap-2">
-        {/* Left: page navigation */}
-        <div className="flex gap-2 flex-shrink-0">
-          <button onClick={() => navigate('/staff')}
-            className="flex items-center gap-1.5 bg-zinc-800 hover:bg-orange-500/20 hover:text-orange-400 text-zinc-400 text-sm font-semibold px-3 py-2 rounded-xl transition-all border border-zinc-700">
-            <ShoppingCart className="w-4 h-4" /> Counter
-          </button>
-          <button className="flex items-center gap-1.5 bg-blue-500 text-white text-sm font-semibold px-3 py-2 rounded-xl" style={{ fontFamily: 'Sora, sans-serif' }}>
-            <Package className="w-4 h-4" /> Packing
-          </button>
-          <button onClick={() => navigate('/counter')}
-            className="flex items-center gap-1.5 bg-zinc-800 hover:bg-green-500/20 hover:text-green-400 text-zinc-400 text-sm font-semibold px-3 py-2 rounded-xl transition-all border border-zinc-700">
-            <Bell className="w-4 h-4" /> Ready
-          </button>
-        </div>
+      {/* Nav tabs — visibility based on navView */}
+      <div className="sm:sticky sm:top-16 sm:z-30 bg-zinc-900 border-b border-zinc-800">
+        <div className="flex items-center gap-2 px-3 py-2 overflow-x-auto">
 
-        {/* Right: filter tabs */}
-        <div className="flex gap-1 flex-shrink-0">
-          {[
-            { key: 'all', label: 'All', count: orders.length },
-            { key: 'new', label: 'New', count: pending.length },
-            { key: 'packing', label: 'Packing', count: inProgress.length },
-          ].map(tab => (
-            <button key={tab.key} onClick={() => setFilter(tab.key)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
-                filter === tab.key ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
-              }`} style={{ fontFamily: 'Sora, sans-serif' }}>
-              {tab.label}
-              <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${filter === tab.key ? 'bg-white/20 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
-                {tab.count}
-              </span>
+          {/* Packing tab — visible only when navView = 'packing' */}
+          {navView === 'packing' && (
+            <button
+              className="flex-shrink-0 flex items-center gap-1.5 bg-blue-500 text-white text-sm font-semibold px-3 py-2 rounded-xl"
+              style={{ fontFamily: 'Sora, sans-serif' }}
+            >
+              <Package className="w-4 h-4" /> Packing
             </button>
-          ))}
+          )}
+
+
+          {/* When on Packing view: show filter tabs */}
+          {navView === 'packing' && (
+            <>
+              <div className="w-px h-6 bg-zinc-700 flex-shrink-0" />
+              {[
+                { key: 'all', label: 'All', count: orders.length },
+                { key: 'new', label: 'New', count: pending.length },
+                { key: 'packing', label: 'Packing', count: inProgress.length },
+                { key: 'done', label: 'Done', count: completed.length },
+              ].map(tab => (
+                <button key={tab.key} onClick={() => setFilter(tab.key)}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    filter === tab.key ? 'bg-orange-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
+                  }`} style={{ fontFamily: 'Sora, sans-serif' }}>
+                  {tab.label}
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${filter === tab.key ? 'bg-white/20 text-white' : 'bg-zinc-800 text-zinc-400'}`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* Back to Packing — only visible when on Ready view */}
+          {navView === 'ready' && (
+            <button
+              onClick={() => setNavView('packing')}
+              className="flex-shrink-0 flex items-center gap-1.5 bg-zinc-800 hover:bg-blue-500/20 hover:text-blue-400 text-zinc-500 text-xs font-semibold px-3 py-2 rounded-xl border border-zinc-700 transition-all ml-auto"
+            >
+              ← Back to Packing
+            </button>
+          )}
         </div>
       </div>
 
@@ -165,21 +175,21 @@ export default function PackingPage() {
               return (
                 <div key={order._id}
                   className={`flex overflow-hidden animate-slide-up ${
-                    isInProgress ? 'bg-yellow-500/5' : isPending ? 'bg-zinc-900' : 'bg-green-500/5'
+                    isInProgress ? 'bg-yellow-500/5' : isPending ? 'bg-orange-500/5' : 'bg-green-500/5'
                   }`}>
 
                   {/* LEFT — Token + time */}
                   <div className={`flex flex-col items-center justify-center px-2.5 py-2 min-w-[58px] flex-shrink-0 ${
-                    isInProgress ? 'bg-yellow-500' : isPending ? 'bg-zinc-800' : 'bg-green-500'
+                    isInProgress ? 'bg-yellow-500' : isPending ? 'bg-orange-500' : 'bg-green-500'
                   }`}>
-                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isInProgress ? 'text-yellow-900' : isPending ? 'text-zinc-500' : 'text-green-900'}`}>
+                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isInProgress ? 'text-yellow-900' : isPending ? 'text-orange-950' : 'text-green-900'}`}>
                       TOKEN
                     </span>
                     <span className={`text-2xl font-black leading-none ${isInProgress ? 'text-yellow-950' : isPending ? 'text-white' : 'text-green-950'}`}
                       style={{ fontFamily: 'Sora, sans-serif' }}>
                       {order.tokenNumber}
                     </span>
-                    <div className={`flex items-center gap-0.5 text-[9px] font-semibold mt-0.5 ${isInProgress ? 'text-yellow-800' : isPending ? 'text-zinc-500' : 'text-green-800'}`}>
+                    <div className={`flex items-center gap-0.5 text-[9px] font-semibold mt-0.5 ${isInProgress ? 'text-yellow-800' : isPending ? 'text-orange-200' : 'text-green-800'}`}>
                       <Clock className="w-2.5 h-2.5" />
                       {elapsed(order.createdAt)}
                     </div>
@@ -190,17 +200,17 @@ export default function PackingPage() {
                     {/* Status header row */}
                     <div className={`flex items-center justify-between px-3 py-1.5 border-b ${
                       isInProgress ? 'border-yellow-500/30 bg-yellow-500/10'
-                      : isPending ? 'border-zinc-800 bg-zinc-800/50'
+                      : isPending ? 'border-orange-500/30 bg-orange-500/10'
                       : 'border-green-500/20 bg-green-500/10'
                     }`}>
                       <div className="flex items-center gap-1.5">
                         {isInProgress
                           ? <Loader2 className="w-3 h-3 text-yellow-400 animate-spin" />
                           : isPending
-                            ? <Bell className="w-3 h-3 text-zinc-400" />
+                            ? <Bell className="w-3 h-3 text-orange-400" />
                             : <CheckCircle className="w-3 h-3 text-green-400" />}
                         <span className={`text-[11px] font-bold tracking-wide ${
-                          isInProgress ? 'text-yellow-300' : isPending ? 'text-zinc-300' : 'text-green-300'
+                          isInProgress ? 'text-yellow-300' : isPending ? 'text-orange-300' : 'text-green-300'
                         }`}>
                           {isInProgress ? 'IN PROGRESS' : isPending ? 'PENDING' : 'DONE'}
                         </span>
@@ -265,6 +275,7 @@ export default function PackingPage() {
           </div>
         )}
       </main>
+
     </div>
   );
 }

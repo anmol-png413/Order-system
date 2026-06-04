@@ -108,7 +108,7 @@ export default function LoginPage() {
                 ['admin',          'admin',    'admin123'],
                 ['Order Counter',  'staff1',   'staff123'],
                 ['Packing',        'packer1',  'packer123'],
-                ['Pickup Counter', 'counter1', 'counter123'],
+                // ['Pickup Counter', 'counter1', 'counter123'],
               ].map(([label, u, p]) => (
                 <button key={label} onClick={() => setForm({ username: u, password: p })}
                   className="text-left bg-zinc-800/60 hover:bg-zinc-800 rounded-lg px-3 py-1.5 transition-colors">

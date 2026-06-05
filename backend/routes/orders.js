@@ -75,6 +75,14 @@ router.post('/', async (req, res) => {
 
     if (userId) await order.populate('createdBy', 'name');
 
+    // Increment orderCount for each product ordered
+    const Product = require('../models/Product');
+    await Promise.all(
+      items.map(item =>
+        Product.findByIdAndUpdate(item.product, { $inc: { orderCount: item.quantity } })
+      )
+    );
+
     req.io.to('packing').emit('new-order', order);
     req.io.to('admin').emit('new-order', order);
 

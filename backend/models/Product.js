@@ -9,6 +9,8 @@ const productSchema = new mongoose.Schema(
     description: { type: String, default: '' },
     isAvailable: { type: Boolean, default: true },
     sortOrder: { type: Number, default: 0 },
+    unit: { type: String, enum: ['kg', 'piece'], default: 'kg' },
+    orderCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

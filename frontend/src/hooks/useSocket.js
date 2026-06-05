@@ -9,7 +9,8 @@ export const useSocket = (room, handlers = {}) => {
 
   useEffect(() => {
     if (!socketInstance) {
-      socketInstance = io('/', { withCredentials: true, transports: ['websocket'] });
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+      socketInstance = io(backendUrl, { withCredentials: true, transports: ['websocket', 'polling'] });
     }
 
     const socket = socketInstance;

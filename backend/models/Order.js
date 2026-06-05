@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Counter = require('./Counter');
 
 const orderItemSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
@@ -6,7 +7,8 @@ const orderItemSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   quantity: { type: Number, required: true, min: 1 },
   image: { type: String },
-});
+  quantityLabel: { type: String, default: '' },
+}, { _id: false }); // no _id per item — saves ~12 bytes × items × orders
 
 const orderSchema = new mongoose.Schema(
   {
@@ -17,6 +19,7 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: ['pending', 'in-progress', 'completed'],
       default: 'pending',
+      index: true,
     },
     notes: { type: String, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -26,15 +29,15 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Auto-generate token number
+// Indexes for common queries (status filter + date sort used on every page load)
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ packedAt: -1 }); // counter page: last 2 hours filter
+
+// Atomic token number — daily reset (1, 2, 3... resets to 1 next day)
 orderSchema.pre('save', async function (next) {
   if (this.isNew) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const count = await mongoose.model('Order').countDocuments({
-      createdAt: { $gte: today },
-    });
-    this.tokenNumber = count + 1;
+    this.tokenNumber = await Counter.getNextToken();
   }
   next();
 });

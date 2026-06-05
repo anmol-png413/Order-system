@@ -3,6 +3,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import { useSocket } from '../hooks/useSocket';
+import { useAuth } from '../context/AuthContext';
 import { Bell, CheckCircle, Loader2, Package, Clock } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -43,6 +44,8 @@ function elapsed(createdAt, now) {
 }
 
 export default function PackingPage() {
+  const { user } = useAuth();
+  const canUpdate = user?.role === 'packing' || user?.role === 'admin';
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
@@ -228,8 +231,8 @@ export default function PackingPage() {
                       </div>
                     )}
 
-                    {/* Action button */}
-                    {cfg.btn ? (
+                    {/* Action button — only packing/admin can change status */}
+                    {canUpdate && cfg.btn ? (
                       <button
                         onClick={() => updateStatus(order)}
                         disabled={updating === order._id}
@@ -242,12 +245,12 @@ export default function PackingPage() {
                           <><CheckCircle className="w-4 h-4" /> {cfg.btnLabel}</>
                         )}
                       </button>
-                    ) : (
+                    ) : !cfg.btn ? (
                       <div className="w-full py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-semibold text-center"
                         style={{ fontFamily: 'Sora, sans-serif' }}>
                         ✓ Ready for Pickup
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               );

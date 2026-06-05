@@ -43,7 +43,7 @@ function buildSlipHTML(tokenNumber, items, notes) {
     .right{text-align:right}
     .total-row td{font-weight:bold;font-size:15px;padding-top:6px}
   </style></head><body>
-  <div class="center bold" style="font-size:20px;letter-spacing:1px">OrderFlow</div>
+  <div class="center bold" style="font-size:20px;letter-spacing:1px">Green Sweets</div>
   <div class="center" style="font-size:11px">${now.toLocaleDateString('en-IN')} &nbsp; ${now.toLocaleTimeString('en-IN')}</div>
   <div class="line"></div>
   <div class="center bold" style="font-size:11px;letter-spacing:3px">TOKEN NUMBER</div>
@@ -221,6 +221,11 @@ export default function StaffPage() {
     axios.get('/api/orders').then(res => setLiveOrders(res.data)).catch(() => {});
   }, []);
 
+  const openStatusModal = (type) => {
+    fetchLiveOrders();
+    setStatusModal(type);
+  };
+
   useEffect(() => {
     let timer;
     const onScroll = () => {
@@ -277,7 +282,7 @@ export default function StaffPage() {
     const inCat = activeCategory === 'All' || p.category === activeCategory;
     const inSearch = p.name.toLowerCase().includes(search.toLowerCase());
     return inCat && inSearch;
-  });
+  }).sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0));
 
   const openModal = (product) => {
     setModalProduct(product);
@@ -302,7 +307,7 @@ export default function StaffPage() {
         price: calculatedPrice,
         image: modalProduct.image,
         unit: modalProduct.unit,
-        quantity: 1,
+        quantity: modalQty,
         quantityLabel: label,
       };
     } else {
@@ -369,12 +374,12 @@ export default function StaffPage() {
         <button className="flex-shrink-0 flex items-center gap-2 bg-orange-500 text-white text-sm font-semibold px-4 py-2 rounded-xl" style={{ fontFamily: 'Sora, sans-serif' }}>
           <ShoppingCart className="w-4 h-4" /> Counter
         </button>
-        <button onClick={() => setStatusModal('packing')}
+        <button onClick={() => openStatusModal('packing')}
           className="flex-shrink-0 flex items-center gap-2 bg-zinc-800 hover:bg-blue-500/20 hover:text-blue-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700">
           <Package className="w-4 h-4" /> Packing
           {packingCount > 0 && <span className="bg-blue-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{packingCount}</span>}
         </button>
-        <button onClick={() => setStatusModal('counter')}
+        <button onClick={() => openStatusModal('counter')}
           className="flex-shrink-0 flex items-center gap-2 bg-zinc-800 hover:bg-green-500/20 hover:text-green-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700">
           <Bell className="w-4 h-4" /> Ready
           {readyCount > 0 && <span className="bg-green-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{readyCount}</span>}
@@ -404,11 +409,11 @@ export default function StaffPage() {
                 className="flex items-center gap-2 bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold px-4 py-3 rounded-xl transition-all text-sm">
                 <Printer className="w-4 h-4" /> Print Slip
               </button>
-              <button onClick={() => { setSuccessData(null); setStatusModal('packing'); }}
+              <button onClick={() => { setSuccessData(null); openStatusModal('packing'); }}
                 className="flex items-center gap-2 bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold px-4 py-3 rounded-xl transition-all text-sm">
                 <Package className="w-4 h-4" /> Packing Status
               </button>
-              <button onClick={() => { setSuccessData(null); setStatusModal('counter'); }}
+              <button onClick={() => { setSuccessData(null); openStatusModal('counter'); }}
                 className="flex items-center gap-2 bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold px-4 py-3 rounded-xl transition-all text-sm">
                 <Bell className="w-4 h-4" /> Counter Status
               </button>
@@ -486,9 +491,22 @@ export default function StaffPage() {
                     value={modalWeight}
                     onChange={e => setModalWeight(e.target.value)}
                     placeholder="Or type: e.g. 250g"
-                    autoFocus
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-lg focus:outline-none focus:border-orange-500"
                   />
+
+                  {/* Quantity counter for kg products */}
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-zinc-400 text-sm font-medium">Quantity</span>
+                    <div className="flex items-center gap-3 bg-zinc-800 rounded-xl p-1">
+                      <button onClick={() => setModalQty(q => Math.max(1, q - 1))} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300">
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <span className="text-white font-bold text-xl w-10 text-center" style={{ fontFamily: 'Sora, sans-serif' }}>{modalQty}</span>
+                      <button onClick={() => setModalQty(q => q + 1)} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300">
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between mb-2">
@@ -511,7 +529,7 @@ export default function StaffPage() {
               <button onClick={addFromModal} className="w-full btn-primary py-4 flex items-center justify-center gap-2 text-base">
                 <ShoppingCart className="w-5 h-5" />
                 {modalProduct.unit !== 'piece'
-                  ? `Add — ${parseWeightToKg(modalWeight) ? `₹${(modalProduct.price * parseWeightToKg(modalWeight)).toFixed(2)}` : 'enter weight'}`
+                  ? `Add${modalQty > 1 ? ` ×${modalQty}` : ''} — ${parseWeightToKg(modalWeight) ? `₹${(modalProduct.price * parseWeightToKg(modalWeight) * modalQty).toFixed(2)}` : 'enter weight'}`
                   : `Add to Cart — ₹${(modalProduct.price * modalQty).toFixed(2)}`}
               </button>
             </div>
@@ -550,8 +568,9 @@ export default function StaffPage() {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start pb-24 sm:pb-4">
-              {filtered.map(product => {
+              {filtered.map((product, index) => {
                 const qty = getCartQty(product._id);
+                const isPopular = index < 3 && (product.orderCount || 0) > 0;
                 return (
                   <button key={product._id} onClick={() => openModal(product)}
                     className={`card overflow-hidden text-left group transition-all duration-200 hover:border-orange-500/50 active:scale-95 ${qty > 0 ? 'border-orange-500/60 bg-orange-500/5' : ''}`}>
@@ -560,6 +579,11 @@ export default function StaffPage() {
                         loading="lazy" width="200" height="200"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onError={e => { e.target.src = IMG_FALLBACK; }} />
+                      {isPopular && (
+                        <div className="absolute top-2 left-2 bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shadow-lg">
+                          🔥 Popular
+                        </div>
+                      )}
                       {qty > 0 && (
                         <div className="absolute top-2 right-2 w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg animate-pop">
                           {qty}
@@ -703,13 +727,13 @@ export default function StaffPage() {
       <div className={`hidden sm:flex fixed bottom-6 left-6 z-30 flex-col gap-2 transition-all duration-300 ${
         showFloating ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'
       }`}>
-        <button onClick={() => setStatusModal('counter')}
+        <button onClick={() => openStatusModal('counter')}
           className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white rounded-xl px-4 py-3 shadow-xl transition-all active:scale-95">
           <Bell className="w-5 h-5" />
           <span className="font-semibold text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>Ready</span>
           <span className="bg-white/20 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[22px] text-center">{readyCount}</span>
         </button>
-        <button onClick={() => setStatusModal('packing')}
+        <button onClick={() => openStatusModal('packing')}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-3 shadow-xl transition-all active:scale-95">
           <Package className="w-5 h-5" />
           <span className="font-semibold text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>Packing</span>

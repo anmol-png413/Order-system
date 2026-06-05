@@ -29,7 +29,7 @@ function printSlip(order) {
     .right{text-align:right}
     .total-row td{font-weight:bold;font-size:15px;padding-top:6px}
   </style></head><body>
-  <div class="center bold" style="font-size:20px;letter-spacing:1px">OrderFlow</div>
+  <div class="center bold" style="font-size:20px;letter-spacing:1px">Green Sweets</div>
   <div class="center" style="font-size:11px">${now.toLocaleDateString('en-IN')} &nbsp; ${now.toLocaleTimeString('en-IN')}</div>
   <div class="line"></div>
   <div class="center bold" style="font-size:11px;letter-spacing:3px">TOKEN NUMBER</div>

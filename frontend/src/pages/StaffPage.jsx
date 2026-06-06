@@ -607,7 +607,7 @@ export default function StaffPage() {
               {filtered.length === 0 && !loading && (
                 <div className="col-span-full text-center py-16 text-zinc-600">
                   <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>No products found</p>
+                  <p>No product found</p>
                 </div>
               )}
             </div>

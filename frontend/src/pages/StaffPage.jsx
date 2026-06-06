@@ -31,9 +31,10 @@ function fmtQty(quantity, quantityLabel, unit) {
 function buildSlipHTML(tokenNumber, items, notes) {
   const now = new Date();
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Green Sweets</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
+    @page{margin:4mm}
     body{font-family:'Courier New',monospace;width:290px;margin:auto;padding:12px;font-size:13px}
     .center{text-align:center}.bold{font-weight:bold}
     .big{font-size:32px;font-weight:900;letter-spacing:2px}
@@ -52,18 +53,26 @@ function buildSlipHTML(tokenNumber, items, notes) {
   <table>
     <tr><td class="bold" style="font-size:11px">ITEM</td><td class="right bold" style="font-size:11px">AMT</td></tr>
     <tr><td colspan="2"><div class="line"></div></td></tr>
-    ${items.map(i => `<tr>
-      <td style="font-size:12px">${i.name}<br>
-        <span style="color:#555;font-size:11px">${i.quantityLabel || (i.unit === 'piece' ? i.quantity + ' pcs' : i.quantity + ' kg')} @ ₹${i.price.toFixed(2)}</span>
-      </td>
-      <td class="right">₹${(i.price * i.quantity).toFixed(2)}</td>
-    </tr>`).join('')}
+    ${items.map(i => {
+      const isKg = i.unit !== 'piece';
+      const weightLabel = i.quantityLabel || (isKg ? i.quantity + ' kg' : '');
+      const qtyLabel = isKg
+        ? (i.quantity > 1 ? `${weightLabel} × ${i.quantity} pkt @ ₹${i.price.toFixed(2)}` : `${weightLabel} @ ₹${i.price.toFixed(2)}`)
+        : `${i.quantity} pcs @ ₹${i.price.toFixed(2)}`;
+      return `<tr>
+        <td style="font-size:12px">${i.name}<br>
+          <span style="color:#555;font-size:11px">${qtyLabel}</span>
+        </td>
+        <td class="right">₹${(i.price * i.quantity).toFixed(2)}</td>
+      </tr>`;
+    }).join('')}
     <tr><td colspan="2"><div class="line"></div></td></tr>
     <tr class="total-row"><td>TOTAL</td><td class="right">₹${total.toFixed(2)}</td></tr>
   </table>
   ${notes ? `<div class="line"></div><div style="font-size:11px">Note: ${notes}</div>` : ''}
   <div class="line"></div>
   <div class="center" style="font-size:12px;font-weight:bold">Thank you! Visit again ✓</div>
+  <div class="center" style="font-size:10px;margin-top:4px;color:#555">+91 98880 77154</div>
   </body></html>`;
 }
 
@@ -73,9 +82,8 @@ function writeAndPrint(win, html) {
   win.focus();
   setTimeout(() => {
     win.print();
-    // Close after print dialog closes, or after 3s fallback
-    win.onafterprint = () => win.close();
-    setTimeout(() => { if (!win.closed) win.close(); }, 3000);
+    win.onafterprint = () => setTimeout(() => win.close(), 1500);
+    setTimeout(() => { if (!win.closed) win.close(); }, 5000);
   }, 300);
 }
 
@@ -620,7 +628,7 @@ export default function StaffPage() {
             <h3 className="font-bold text-white text-lg" style={{ fontFamily: 'Sora, sans-serif' }}>Cart</h3>
             <span className="bg-orange-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">{cartCount} items</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          <div className="overflow-y-auto p-3 space-y-2" style={{ maxHeight: '60vh' }}>
             {cart.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-zinc-600 py-10">
                 <ShoppingCart className="w-12 h-12 mb-3 opacity-20" />

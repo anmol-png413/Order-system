@@ -60,16 +60,33 @@ router.post('/', async (req, res) => {
       } catch {}
     }
 
-    const { items, notes } = req.body;
+    const { items, notes, discountPercent = 0, bulk } = req.body;
     if (!items || items.length === 0)
       return res.status(400).json({ message: 'Order must have at least one item' });
 
+    const parsedDiscount = Number(discountPercent) || 0;
+    if (parsedDiscount < 0 || parsedDiscount > 100)
+      return res.status(400).json({ message: 'Discount percent must be between 0 and 100' });
+
     const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const discountAmount = +(totalAmount * (parsedDiscount / 100)).toFixed(2);
+    const payableAmount = +(totalAmount - discountAmount).toFixed(2);
+
+    const bulkInfo = bulk ? {
+      phone: bulk.phone || '',
+      advance: Number(bulk.advance) || 0,
+      schedule: bulk.schedule ? new Date(bulk.schedule) : undefined,
+      balance: +(payableAmount - (Number(bulk.advance) || 0)).toFixed(2),
+    } : undefined;
 
     const order = await Order.create({
       items,
       totalAmount,
       notes,
+      discountPercent: parsedDiscount,
+      discountAmount,
+      payableAmount,
+      bulk: bulkInfo,
       ...(userId && { createdBy: userId }),
     });
 

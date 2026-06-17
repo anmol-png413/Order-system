@@ -9,3 +9,4 @@ uploads/
 backend/uploads/
 .DS_Store
 *.log
+credentials.md

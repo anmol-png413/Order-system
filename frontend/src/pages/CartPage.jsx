@@ -94,16 +94,18 @@ export default function CartPage() {
                     <div className="flex items-center gap-2 bg-zinc-800 rounded-lg p-0.5">
                       <button
                         onClick={() => updateQty(item._id, item.quantity - 1)}
-                        className="w-7 h-7 rounded-md hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                        aria-label={`Decrease ${item.name} quantity`}
+                        className="w-9 h-9 rounded-md hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
                       >
-                        <Minus className="w-3.5 h-3.5" />
+                        <Minus className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
-                      <span className="text-white font-semibold text-sm w-5 text-center">{item.quantity}</span>
+                      <span className="text-white font-semibold text-sm w-5 text-center" aria-live="polite">{item.quantity}</span>
                       <button
                         onClick={() => updateQty(item._id, item.quantity + 1)}
-                        className="w-7 h-7 rounded-md hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                        aria-label={`Increase ${item.name} quantity`}
+                        className="w-9 h-9 rounded-md hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                       </button>
                     </div>
                     <p className="text-orange-400 font-bold text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>

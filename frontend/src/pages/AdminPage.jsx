@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
-import { Plus, Edit2, Trash2, X, BarChart3, Package, Users, ShoppingBag, Upload, Eye, EyeOff, AlertTriangle, ClipboardList, Clock } from 'lucide-react';
+import { useSocket } from '../hooks/useSocket';
+import { Plus, Edit2, Trash2, X, BarChart3, Package, Users, ShoppingBag, Upload, Eye, EyeOff, AlertTriangle, ClipboardList, Clock, Phone, Calendar, Wallet, TrendingUp, Award, Layers } from 'lucide-react';
+import { getThumbUrl } from '../utils/imageUtils';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
@@ -18,6 +20,7 @@ const STATUS_COLORS = {
 export default function AdminPage() {
   const [tab, setTab] = useState('Dashboard');
   const [stats, setStats] = useState(null);
+  const [reports, setReports] = useState(null);
   const [products, setProducts] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -44,11 +47,17 @@ export default function AdminPage() {
   const [showPass, setShowPass] = useState(false);
 
   useEffect(() => {
-    if (tab === 'Dashboard') fetchStats();
+    if (tab === 'Dashboard') { fetchStats(); fetchReports(); }
     if (tab === 'Products') fetchProducts();
     if (tab === 'Users') fetchUsers();
     if (tab === 'Orders') fetchOrders();
   }, [tab]);
+
+  useSocket('admin', {
+    'new-order':     (order)         => setOrders(prev => [order, ...prev]),
+    'order-updated': (updated)       => setOrders(prev => prev.map(o => o._id === updated._id ? updated : o)),
+    'order-deleted': ({ _id })       => setOrders(prev => prev.filter(o => o._id !== _id)),
+  });
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -88,6 +97,13 @@ export default function AdminPage() {
       const res = await axios.get('/api/orders/stats');
       setStats(res.data);
     } catch { toast.error('Failed to load stats'); }
+  };
+
+  const fetchReports = async () => {
+    try {
+      const res = await axios.get('/api/orders/reports');
+      setReports(res.data);
+    } catch { /* non-critical, silently fail */ }
   };
 
   const fetchProducts = async () => {
@@ -150,11 +166,19 @@ export default function AdminPage() {
   const deleteProduct = async () => {
     if (!deleteConfirm) return;
     try {
-      await axios.delete(`/api/products/${deleteConfirm.id}`);
-      setProducts(prev => prev.filter(p => p._id !== deleteConfirm.id));
-      toast.success('Product deleted');
-    } catch { toast.error('Failed to delete'); }
+      const res = await axios.delete(`/api/products/${deleteConfirm.id}`);
+      setProducts(prev => prev.map(p => p._id === deleteConfirm.id ? res.data.product : p));
+      toast.success(`"${deleteConfirm.name}" archived`);
+    } catch { toast.error('Failed to archive product'); }
     finally { setDeleteConfirm(null); }
+  };
+
+  const restoreProduct = async (id) => {
+    try {
+      const res = await axios.patch(`/api/products/${id}/restore`);
+      setProducts(prev => prev.map(p => p._id === id ? res.data : p));
+      toast.success('Product restored');
+    } catch { toast.error('Failed to restore'); }
   };
 
   const saveUser = async () => {
@@ -233,20 +257,212 @@ export default function AdminPage() {
                     <p className="text-2xl sm:text-4xl font-extrabold text-orange-400 break-all" style={{ fontFamily: 'Sora, sans-serif' }}>₹{stats.totalRevenue.toFixed(2)}</p>
                   </div>
                 </div>
-                <div className="card p-5">
-                  <h3 className="font-semibold text-zinc-300 mb-1" style={{ fontFamily: 'Sora, sans-serif' }}>Quick Setup</h3>
-                  <p className="text-xs text-zinc-600 mb-4">First time? Seed the database with demo accounts</p>
-                  <button onClick={async () => {
-                    try { await axios.post('/api/auth/seed'); toast.success('Demo accounts created!'); }
-                    catch (err) { toast.error(err.response?.data?.message || 'Seed failed'); }
-                  }} className="btn-ghost text-sm">Seed Demo Data</button>
-                </div>
               </>
             ) : (
               <div className="flex items-center justify-center py-16">
                 <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
+
+            {/* ── ANALYTICS SECTION ── */}
+            {reports ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pt-2">
+                  <TrendingUp className="w-5 h-5 text-orange-400" />
+                  <h2 className="text-xl font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>Analytics (Last 30 Days)</h2>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* 7-Day Revenue Chart */}
+                  <div className="card p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <BarChart3 className="w-4 h-4 text-orange-400" />
+                      <h3 className="font-semibold text-zinc-200 text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>Revenue — Last 7 Days</h3>
+                    </div>
+                    {(() => {
+                      // Build full 7-day array (fill missing days with 0)
+                      const days = [];
+                      for (let i = 6; i >= 0; i--) {
+                        const d = new Date();
+                        d.setDate(d.getDate() - i);
+                        const key = d.toISOString().split('T')[0];
+                        const found = reports.weeklyRevenue.find(r => r._id === key);
+                        const label = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' });
+                        days.push({ label, revenue: found?.revenue || 0, orders: found?.orders || 0 });
+                      }
+                      const maxRev = Math.max(...days.map(d => d.revenue), 1);
+                      return (
+                        <div className="space-y-2">
+                          {days.map((d, i) => (
+                            <div key={i} className="flex items-center gap-3">
+                              <span className="text-xs text-zinc-500 w-[70px] flex-shrink-0">{d.label}</span>
+                              <div className="flex-1 h-7 bg-zinc-800 rounded-lg overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-orange-500 to-orange-400 rounded-lg flex items-center justify-end pr-2 transition-all"
+                                  style={{ width: `${Math.max((d.revenue / maxRev) * 100, d.revenue > 0 ? 4 : 0)}%` }}
+                                >
+                                  {d.revenue > 0 && <span className="text-xs font-bold text-white/90 whitespace-nowrap">₹{d.revenue.toFixed(0)}</span>}
+                                </div>
+                              </div>
+                              <span className="text-xs text-zinc-600 w-[30px] text-right flex-shrink-0">{d.orders}o</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Best-Selling Products */}
+                  <div className="card p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Award className="w-4 h-4 text-yellow-400" />
+                      <h3 className="font-semibold text-zinc-200 text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>Best Sellers (by Quantity)</h3>
+                    </div>
+                    {reports.bestProducts.length === 0 ? (
+                      <p className="text-zinc-600 text-sm">No data yet</p>
+                    ) : (() => {
+                      const maxQty = Math.max(...reports.bestProducts.map(p => p.totalQty), 1);
+                      return (
+                        <div className="space-y-2.5">
+                          {reports.bestProducts.map((p, i) => (
+                            <div key={i} className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-zinc-300 truncate max-w-[180px]">
+                                  <span className="text-zinc-600 mr-1.5">#{i + 1}</span>{p._id}
+                                </span>
+                                <span className="text-xs text-zinc-500 flex-shrink-0 ml-2">{p.totalQty} units</span>
+                              </div>
+                              <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-yellow-500 to-orange-400 rounded-full"
+                                  style={{ width: `${(p.totalQty / maxQty) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Busy Hours */}
+                  <div className="card p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Clock className="w-4 h-4 text-blue-400" />
+                      <h3 className="font-semibold text-zinc-200 text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>Peak Hours (Orders by Hour)</h3>
+                    </div>
+                    {reports.busyHours.length === 0 ? (
+                      <p className="text-zinc-600 text-sm">No data yet</p>
+                    ) : (() => {
+                      const hourMap = {};
+                      reports.busyHours.forEach(h => { hourMap[h._id] = h.count; });
+                      const maxCount = Math.max(...Object.values(hourMap), 1);
+                      // Show 7am–11pm (hours 7–23)
+                      const hours = Array.from({ length: 17 }, (_, i) => i + 7);
+                      return (
+                        <div className="space-y-1.5">
+                          {hours.map(h => {
+                            const count = hourMap[h] || 0;
+                            const label = h === 12 ? '12pm' : h > 12 ? `${h - 12}pm` : `${h}am`;
+                            return (
+                              <div key={h} className="flex items-center gap-2">
+                                <span className="text-xs text-zinc-600 w-[34px] flex-shrink-0 text-right">{label}</span>
+                                <div className="flex-1 h-5 bg-zinc-800 rounded overflow-hidden">
+                                  <div
+                                    className={`h-full rounded transition-all ${count > maxCount * 0.7 ? 'bg-red-500' : count > maxCount * 0.4 ? 'bg-orange-400' : 'bg-blue-500/60'}`}
+                                    style={{ width: `${Math.max((count / maxCount) * 100, count > 0 ? 3 : 0)}%` }}
+                                  />
+                                </div>
+                                {count > 0 && <span className="text-xs text-zinc-600 w-[18px] flex-shrink-0">{count}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Staff Performance + Category Revenue stacked */}
+                  <div className="space-y-4">
+                    {/* Staff Performance */}
+                    <div className="card p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Users className="w-4 h-4 text-green-400" />
+                        <h3 className="font-semibold text-zinc-200 text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>Staff Performance (Orders Packed)</h3>
+                      </div>
+                      {reports.staffPerformance.length === 0 ? (
+                        <p className="text-zinc-600 text-sm">No completed orders yet</p>
+                      ) : (() => {
+                        const maxCount = Math.max(...reports.staffPerformance.map(s => s.count), 1);
+                        return (
+                          <div className="space-y-2.5">
+                            {reports.staffPerformance.map((s, i) => (
+                              <div key={i} className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-zinc-300 flex items-center gap-1.5">
+                                    {i === 0 && <span className="text-yellow-400">🏆</span>}
+                                    {s.name}
+                                  </span>
+                                  <span className="text-xs font-bold text-green-400">{s.count} orders</span>
+                                </div>
+                                <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full"
+                                    style={{ width: `${(s.count / maxCount) * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Revenue by Category */}
+                    <div className="card p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Layers className="w-4 h-4 text-purple-400" />
+                        <h3 className="font-semibold text-zinc-200 text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>Revenue by Category</h3>
+                      </div>
+                      {reports.categoryRevenue.length === 0 ? (
+                        <p className="text-zinc-600 text-sm">No data yet</p>
+                      ) : (() => {
+                        const maxRev = Math.max(...reports.categoryRevenue.map(c => c.revenue), 1);
+                        const COLORS = ['from-purple-500 to-purple-400', 'from-pink-500 to-rose-400', 'from-indigo-500 to-blue-400', 'from-teal-500 to-cyan-400', 'from-orange-500 to-amber-400'];
+                        return (
+                          <div className="space-y-2.5">
+                            {reports.categoryRevenue.map((c, i) => (
+                              <div key={i} className="space-y-1">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-zinc-300 truncate max-w-[140px]">{c._id}</span>
+                                  <span className="text-xs text-purple-300 font-semibold">₹{c.revenue.toFixed(0)}</span>
+                                </div>
+                                <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full bg-gradient-to-r ${COLORS[i % COLORS.length]} rounded-full`}
+                                    style={{ width: `${(c.revenue / maxRev) * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+              </div>
+            )}
+
+            {/* Quick Setup */}
+            <div className="card p-5">
+              <h3 className="font-semibold text-zinc-300 mb-1" style={{ fontFamily: 'Sora, sans-serif' }}>First Time Setup</h3>
+              <p className="text-xs text-zinc-600">To create demo accounts, run <code className="bg-zinc-800 px-1 py-0.5 rounded text-zinc-400">node backend/seed.js</code> in your project folder, then refresh and login.</p>
+            </div>
           </div>
         )}
 
@@ -261,47 +477,96 @@ export default function AdminPage() {
             </div>
 
             {loading ? (
-              <div className="flex items-center justify-center py-24">
-                <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : (
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {products.map(p => (
-                  <div key={p._id} className={`card overflow-hidden ${!p.isAvailable ? 'opacity-50' : ''}`}>
-                    <div className="aspect-video bg-zinc-800 overflow-hidden relative">
-                      <img src={p.image || IMG_FALLBACK} alt={p.name}
-                        className="w-full h-full object-cover" onError={e => { e.target.src = IMG_FALLBACK; }} />
-                      {/* Unit badge */}
-                      <span className="absolute top-2 left-2 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-lg">
-                        {p.unit === 'piece' ? 'P/p' : '/kg'}
-                      </span>
-                      {!p.isAvailable && <span className="absolute top-2 right-2 bg-zinc-900/80 text-zinc-400 text-xs px-2 py-0.5 rounded-lg">Hidden</span>}
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-zinc-200 text-sm leading-tight mb-0.5" style={{ fontFamily: 'Sora, sans-serif' }}>{p.name}</h3>
-                      <p className="text-xs text-zinc-600 mb-1">{p.category}</p>
-                      <p className="text-orange-400 font-bold">₹{p.price.toFixed(2)} <span className="text-zinc-600 text-xs font-normal">{p.unit === 'piece' ? '/piece' : '/kg'}</span></p>
-                      <div className="flex gap-2 mt-3">
-                        <button onClick={() => openProductModal(p)}
-                          className="flex-1 btn-ghost text-xs py-2.5 flex items-center justify-center gap-1 min-h-[40px]">
-                          <Edit2 className="w-3.5 h-3.5" /> Edit
-                        </button>
-                        <button onClick={() => confirmDelete(p._id, p.name)}
-                          className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1 min-h-[40px]">
-                          <Trash2 className="w-3.5 h-3.5" /> Delete
-                        </button>
-                      </div>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="card overflow-hidden animate-pulse">
+                    <div className="aspect-video bg-zinc-800" />
+                    <div className="p-4 space-y-2">
+                      <div className="h-3.5 bg-zinc-800 rounded w-3/4" />
+                      <div className="h-3 bg-zinc-800 rounded w-1/3" />
+                      <div className="h-3 bg-zinc-800 rounded w-1/2" />
                     </div>
                   </div>
                 ))}
-                {products.length === 0 && (
-                  <div className="col-span-full text-center py-16 text-zinc-600">
-                    <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                    <p>No products yet. Add your first product!</p>
-                  </div>
-                )}
               </div>
-            )}
+            ) : (() => {
+              const activeProducts   = products.filter(p => !p.isDeleted);
+              const archivedProducts = products.filter(p => p.isDeleted);
+              return (
+                <div className="space-y-8">
+                  {/* Active products grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                    {activeProducts.map(p => (
+                      <div key={p._id} className={`card overflow-hidden ${!p.isAvailable ? 'opacity-50' : ''}`}>
+                        <div className="aspect-video bg-zinc-800 overflow-hidden relative">
+                          <img src={getThumbUrl(p.image, 400, 300) || IMG_FALLBACK} alt={p.name}
+                            className="w-full h-full object-cover" onError={e => { e.target.src = IMG_FALLBACK; }} />
+                          <span className="absolute top-2 left-2 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-lg">
+                            {p.unit === 'piece' ? 'P/p' : '/kg'}
+                          </span>
+                          {!p.isAvailable && <span className="absolute top-2 right-2 bg-zinc-900/80 text-zinc-400 text-xs px-2 py-0.5 rounded-lg">Hidden</span>}
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-semibold text-zinc-200 text-sm leading-tight mb-0.5" style={{ fontFamily: 'Sora, sans-serif' }}>{p.name}</h3>
+                          <p className="text-xs text-zinc-600 mb-1">{p.category}</p>
+                          <p className="text-orange-400 font-bold">₹{p.price.toFixed(2)} <span className="text-zinc-600 text-xs font-normal">{p.unit === 'piece' ? '/piece' : '/kg'}</span></p>
+                          <div className="flex gap-2 mt-3">
+                            <button onClick={() => openProductModal(p)}
+                              className="flex-1 btn-ghost text-xs py-2.5 flex items-center justify-center gap-1 min-h-[40px]">
+                              <Edit2 className="w-3.5 h-3.5" /> Edit
+                            </button>
+                            <button onClick={() => confirmDelete(p._id, p.name)}
+                              className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1 min-h-[40px]">
+                              <Trash2 className="w-3.5 h-3.5" /> Archive
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {activeProducts.length === 0 && (
+                      <div className="col-span-full text-center py-16 text-zinc-600">
+                        <Package className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                        <p>No products yet. Add your first product!</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Archived products */}
+                  {archivedProducts.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Trash2 className="w-4 h-4 text-zinc-600" />
+                        <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wide">
+                          Archived ({archivedProducts.length})
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 opacity-50">
+                        {archivedProducts.map(p => (
+                          <div key={p._id} className="card overflow-hidden grayscale">
+                            <div className="aspect-video bg-zinc-800 overflow-hidden relative">
+                              <img src={getThumbUrl(p.image, 400, 300) || IMG_FALLBACK} alt={p.name}
+                                className="w-full h-full object-cover" onError={e => { e.target.src = IMG_FALLBACK; }} />
+                              <span className="absolute top-2 right-2 bg-zinc-900/90 text-zinc-400 text-xs px-2 py-0.5 rounded-lg">Archived</span>
+                            </div>
+                            <div className="p-4">
+                              <h3 className="font-semibold text-zinc-400 text-sm leading-tight mb-0.5" style={{ fontFamily: 'Sora, sans-serif' }}>{p.name}</h3>
+                              <p className="text-xs text-zinc-700 mb-1">{p.category}</p>
+                              <p className="text-zinc-600 font-bold text-sm">₹{p.price.toFixed(2)}</p>
+                              <button
+                                onClick={() => restoreProduct(p._id)}
+                                className="w-full mt-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium py-2.5 rounded-xl transition-colors min-h-[40px]"
+                              >
+                                Restore
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -360,15 +625,15 @@ export default function AdminPage() {
             ) : (
               <div className="space-y-2">
                 {orders.map(order => (
-                  <div key={order._id} className="card px-3 py-3 flex items-start gap-3">
+                  <div key={order._id} className={`card px-3 py-3 flex items-start gap-3 ${(order.bulk?.phone || order.bulk?.customerName) ? 'border-purple-500/30 bg-purple-500/5' : ''}`}>
                     {/* Token */}
-                    <div className="w-11 h-11 bg-zinc-800 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <span className="text-white font-extrabold text-sm" style={{ fontFamily: 'Sora, sans-serif' }}>
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${(order.bulk?.phone || order.bulk?.customerName) ? 'bg-purple-500/20' : 'bg-zinc-800'}`}>
+                      <span className={`font-extrabold text-sm ${(order.bulk?.phone || order.bulk?.customerName) ? 'text-purple-300' : 'text-white'}`} style={{ fontFamily: 'Sora, sans-serif' }}>
                         #{order.tokenNumber}
                       </span>
                     </div>
 
-                    {/* Items + time */}
+                    {/* Items + time + bulk info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap gap-x-3 gap-y-1.5">
                         {order.items.map((item, idx) => (
@@ -382,6 +647,35 @@ export default function AdminPage() {
                           </div>
                         ))}
                       </div>
+
+                      {/* Bulk info */}
+                      {(order.bulk?.phone || order.bulk?.customerName) && (
+                        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                          {order.bulk.customerName && (
+                            <span className="flex items-center gap-1 text-xs text-purple-200 font-semibold">
+                              <Users className="w-3 h-3" /> {order.bulk.customerName}
+                            </span>
+                          )}
+                          {order.bulk.phone && (
+                          <span className="flex items-center gap-1 text-xs text-purple-300 font-medium">
+                            <Phone className="w-3 h-3" /> {order.bulk.phone}
+                          </span>
+                          )}
+                          {order.bulk.schedule && (
+                            <span className="flex items-center gap-1 text-xs text-orange-300 font-semibold">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(order.bulk.schedule).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                          )}
+                          {order.bulk.advance > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-green-300">
+                              <Wallet className="w-3 h-3" /> Advance: ₹{order.bulk.advance?.toFixed(2)}
+                              {order.bulk.balance > 0 && <span className="text-yellow-300 ml-1">| Due: ₹{order.bulk.balance?.toFixed(2)}</span>}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                         <span className="text-zinc-600 text-xs flex items-center gap-1">
                           <Clock className="w-3 h-3" />
@@ -391,6 +685,9 @@ export default function AdminPage() {
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[order.status]}`}>
                           {order.status}
                         </span>
+                        {(order.bulk?.phone || order.bulk?.customerName) && (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400">BULK</span>
+                        )}
                       </div>
                     </div>
 
@@ -488,19 +785,19 @@ export default function AdminPage() {
                 <AlertTriangle className="w-6 h-6 text-red-400" />
               </div>
               <div>
-                <h3 className="font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>Delete Product?</h3>
-                <p className="text-zinc-500 text-sm">This cannot be undone</p>
+                <h3 className="font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>Archive Product?</h3>
+                <p className="text-zinc-500 text-sm">Hidden from staff — can be restored anytime</p>
               </div>
             </div>
             <p className="text-zinc-300 text-sm mb-6 bg-zinc-800 rounded-xl px-4 py-3">
-              <span className="font-semibold text-white">"{deleteConfirm.name}"</span> will be permanently deleted.
+              <span className="font-semibold text-white">"{deleteConfirm.name}"</span> will be archived. Past orders stay intact.
             </p>
             <div className="flex gap-3">
               <button onClick={() => setDeleteConfirm(null)} className="flex-1 btn-ghost min-h-[44px]">Cancel</button>
               <button onClick={deleteProduct}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl transition-colors min-h-[44px]"
+                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl transition-colors min-h-[44px]"
                 style={{ fontFamily: 'Sora, sans-serif' }}>
-                Delete
+                Archive
               </button>
             </div>
           </div>
@@ -547,19 +844,21 @@ export default function AdminPage() {
                 </div>
               ))}
 
-              {/* Category dropdown */}
+              {/* Category — dynamic from existing products, free-type allowed */}
               <div>
                 <label className="block text-xs font-medium text-zinc-400 mb-1 uppercase tracking-wide">Category</label>
-                <select
+                <input
+                  list="category-options"
                   value={productForm.category}
                   onChange={e => setProductForm(p => ({ ...p, category: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 focus:outline-none focus:border-orange-500 text-sm min-h-[44px]"
-                >
-                  <option value="">-- Select Category --</option>
-                  <option value="Counter 1">Counter 1</option>
-                  <option value="Counter 2">Counter 2</option>
-                  <option value="Counter 3">Counter 3</option>
-                </select>
+                  placeholder="Select existing or type new..."
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-orange-500 text-sm min-h-[44px] [color-scheme:dark]"
+                />
+                <datalist id="category-options">
+                  {[...new Set(products.map(p => p.category).filter(Boolean))].sort().map(c => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
               </div>
 
               {/* Unit Toggle */}

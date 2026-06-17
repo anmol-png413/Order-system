@@ -73,6 +73,7 @@ router.post('/', async (req, res) => {
     const payableAmount = +(totalAmount - discountAmount).toFixed(2);
 
     const bulkInfo = bulk ? {
+      customerName: (bulk.customerName || '').trim(),
       phone: bulk.phone || '',
       advance: Number(bulk.advance) || 0,
       schedule: bulk.schedule ? new Date(bulk.schedule) : undefined,
@@ -109,9 +110,12 @@ router.patch('/:id/status', protect, restrictTo('packing', 'admin'), async (req,
       return res.status(400).json({ message: 'Invalid status' });
 
     const updateData = { status };
+    if (status === 'in-progress') {
+      updateData.packedBy = req.user._id; // who claimed the order
+    }
     if (status === 'completed') {
-      updateData.packedBy = req.user._id;
       updateData.packedAt = new Date();
+      updateData.packedBy = req.user._id; // who finished it (may differ from who claimed)
     }
 
     const order = await Order.findByIdAndUpdate(req.params.id, updateData, { new: true })
@@ -126,6 +130,24 @@ router.patch('/:id/status', protect, restrictTo('packing', 'admin'), async (req,
     req.io.to('admin').emit('order-updated', order);
     req.io.to('staff').emit('order-updated', order);
 
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PATCH /api/orders/:id/mark-paid — Collect outstanding bulk order balance
+router.patch('/:id/mark-paid', protect, restrictTo('staff', 'counter', 'packing', 'admin'), async (req, res) => {
+  try {
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      { 'bulk.balancePaid': true },
+      { new: true }
+    ).populate('createdBy', 'name').populate('packedBy', 'name');
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    req.io.to('counter').emit('order-updated', order);
+    req.io.to('staff').emit('order-updated', order);
+    req.io.to('admin').emit('order-updated', order);
     res.json(order);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -154,12 +176,12 @@ router.delete('/bulk', protect, restrictTo('admin'), async (req, res) => {
   }
 });
 
-// DELETE /api/orders/:id — Staff/Admin delete a completed order
+// DELETE /api/orders/:id — Admin can delete any order; staff only completed
 router.delete('/:id', protect, restrictTo('staff', 'admin'), async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
-    if (order.status !== 'completed')
+    if (req.user.role !== 'admin' && order.status !== 'completed')
       return res.status(400).json({ message: 'Only completed orders can be deleted' });
 
     await Order.findByIdAndDelete(req.params.id);
@@ -167,6 +189,7 @@ router.delete('/:id', protect, restrictTo('staff', 'admin'), async (req, res) =>
     req.io.to('packing').emit('order-deleted', { _id: req.params.id });
     req.io.to('counter').emit('order-deleted', { _id: req.params.id });
     req.io.to('admin').emit('order-deleted', { _id: req.params.id });
+    req.io.to('staff').emit('order-deleted', { _id: req.params.id });
 
     res.json({ message: 'Order deleted' });
   } catch (err) {
@@ -200,6 +223,108 @@ router.get('/stats', protect, restrictTo('admin'), async (req, res) => {
       revenue: revenue[0]?.total || 0,
       totalRevenue: totalRevenue[0]?.total || 0,
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/orders/reports — Admin analytics (weekly revenue, best products, staff perf, busy hours, category)
+router.get('/reports', protect, restrictTo('admin'), async (req, res) => {
+  try {
+    const now = new Date();
+
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const TZ = '+05:30'; // IST
+
+    const [weeklyRevenue, bestProducts, staffPerformance, busyHours, categoryRevenue] = await Promise.all([
+      // Daily revenue last 7 days
+      Order.aggregate([
+        { $match: { status: 'completed', createdAt: { $gte: sevenDaysAgo } } },
+        { $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: TZ } },
+          revenue: { $sum: '$payableAmount' },
+          orders: { $sum: 1 },
+        }},
+        { $sort: { _id: 1 } },
+      ]),
+
+      // Best-selling products by quantity, last 30 days
+      Order.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $unwind: '$items' },
+        { $group: {
+          _id: '$items.name',
+          totalQty: { $sum: '$items.quantity' },
+          totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+        }},
+        { $sort: { totalQty: -1 } },
+        { $limit: 8 },
+      ]),
+
+      // Staff packing performance, last 30 days
+      Order.aggregate([
+        { $match: { status: 'completed', packedAt: { $gte: thirtyDaysAgo }, packedBy: { $exists: true, $ne: null } } },
+        { $group: { _id: '$packedBy', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+        { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+        { $project: { name: { $ifNull: ['$user.name', 'Unknown'] }, count: 1 } },
+      ]),
+
+      // Orders by hour of day (IST), last 30 days — peak time analysis
+      Order.aggregate([
+        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+        { $group: {
+          _id: { $hour: { date: '$createdAt', timezone: TZ } },
+          count: { $sum: 1 },
+        }},
+        { $sort: { _id: 1 } },
+      ]),
+
+      // Revenue by product category, last 30 days
+      Order.aggregate([
+        { $match: { status: 'completed', createdAt: { $gte: thirtyDaysAgo } } },
+        { $unwind: '$items' },
+        { $lookup: {
+          from: 'products',
+          localField: 'items.product',
+          foreignField: '_id',
+          as: 'prod',
+        }},
+        { $unwind: { path: '$prod', preserveNullAndEmptyArrays: true } },
+        { $group: {
+          _id: { $ifNull: ['$prod.category', 'Other'] },
+          revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+          qty: { $sum: '$items.quantity' },
+        }},
+        { $sort: { revenue: -1 } },
+      ]),
+    ]);
+
+    res.json({ weeklyRevenue, bestProducts, staffPerformance, busyHours, categoryRevenue });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/orders/customer/:phone — Admin: get all orders by customer phone
+router.get('/customer/:phone', protect, restrictTo('admin'), async (req, res) => {
+  try {
+    const phone = req.params.phone.trim();
+    const orders = await Order.find({ 'bulk.phone': phone })
+      .populate('items.product', 'name image')
+      .populate('createdBy', 'name')
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+    res.json(orders);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

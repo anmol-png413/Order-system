@@ -62,16 +62,16 @@ export default function CounterPage() {
   const [loading, setLoading] = useState(true);
   const [markingPaid, setMarkingPaid] = useState(null);
 
-  const fetchOrders = useCallback(() => {
+  const fetchOrders = useCallback((showError = false) => {
     axios.get('/api/orders').then(res =>
       setOrders(res.data.filter(o => o.status === 'completed'))
-    ).catch(() => toast.error('Failed to load orders'))
+    ).catch(() => { if (showError) toast.error('Failed to load orders'); })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 1000);
+    fetchOrders(true);
+    const interval = setInterval(() => fetchOrders(false), 3000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 

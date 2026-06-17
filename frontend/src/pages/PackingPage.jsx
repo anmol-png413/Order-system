@@ -43,16 +43,16 @@ export default function PackingPage() {
     return `${Math.floor(mins / 60)}h`;
   };
 
-  const fetchOrders = useCallback(() => {
+  const fetchOrders = useCallback((showError = false) => {
     axios.get('/api/orders').then(res => {
       setOrders(res.data);
-    }).catch(() => toast.error('Failed to fetch orders'))
+    }).catch(() => { if (showError) toast.error('Failed to fetch orders'); })
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
-    fetchOrders();
-    const interval = setInterval(fetchOrders, 1000);
+    fetchOrders(true);
+    const interval = setInterval(() => fetchOrders(false), 3000);
     return () => clearInterval(interval);
   }, [fetchOrders]);
 

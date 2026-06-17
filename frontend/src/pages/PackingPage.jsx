@@ -50,7 +50,11 @@ export default function PackingPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 1000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
 
   useSocket('packing', {
     'new-order': (order) => {

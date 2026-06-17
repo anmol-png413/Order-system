@@ -69,7 +69,11 @@ export default function CounterPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 1000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
 
   useSocket('counter', {
     'order-updated': (updated) => {

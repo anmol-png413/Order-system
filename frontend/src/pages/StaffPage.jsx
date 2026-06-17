@@ -98,7 +98,9 @@ export default function StaffPage() {
       setCategories(allowed.length > 1 ? allowed : cats);
     }).catch(() => toast.error('Failed to load products'))
       .finally(() => setLoading(false));
-  }, []);
+    const interval = setInterval(fetchLiveOrders, 1000);
+    return () => clearInterval(interval);
+  }, [fetchLiveOrders]);
 
   useSocket('staff', {
     'new-order':     (order)   => setLiveOrders(prev => prev.find(o => o._id === order._id) ? prev : [order, ...prev]),

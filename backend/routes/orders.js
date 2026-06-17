@@ -27,8 +27,10 @@ router.get('/', protect, async (req, res) => {
       const end = new Date(d);
       end.setHours(23, 59, 59, 999);
       filter.createdAt = { $gte: d, $lte: end };
+    } else if (req.user.role === 'packing') {
+      // 24-hour rolling window — prevents midnight data wipe on packing screen
+      filter.createdAt = { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) };
     } else if (req.user.role !== 'admin') {
-      // Default: today's orders
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       filter.createdAt = { $gte: today };
@@ -60,16 +62,33 @@ router.post('/', async (req, res) => {
       } catch {}
     }
 
-    const { items, notes } = req.body;
+    const { items, notes, discountPercent = 0, bulk } = req.body;
     if (!items || items.length === 0)
       return res.status(400).json({ message: 'Order must have at least one item' });
 
+    const parsedDiscount = Number(discountPercent) || 0;
+    if (parsedDiscount < 0 || parsedDiscount > 100)
+      return res.status(400).json({ message: 'Discount percent must be between 0 and 100' });
+
     const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const discountAmount = +(totalAmount * (parsedDiscount / 100)).toFixed(2);
+    const payableAmount = +(totalAmount - discountAmount).toFixed(2);
+
+    const bulkInfo = bulk ? {
+      phone: bulk.phone || '',
+      advance: Number(bulk.advance) || 0,
+      schedule: bulk.schedule ? new Date(bulk.schedule) : undefined,
+      balance: +(payableAmount - (Number(bulk.advance) || 0)).toFixed(2),
+    } : undefined;
 
     const order = await Order.create({
       items,
       totalAmount,
       notes,
+      discountPercent: parsedDiscount,
+      discountAmount,
+      payableAmount,
+      bulk: bulkInfo,
       ...(userId && { createdBy: userId }),
     });
 
@@ -115,12 +134,34 @@ router.patch('/:id/status', protect, restrictTo('packing', 'admin'), async (req,
   }
 });
 
-// DELETE /api/orders/:id — Staff/Admin delete a completed order
+// DELETE /api/orders/bulk — Admin bulk delete (MUST be before /:id)
+router.delete('/bulk', protect, restrictTo('admin'), async (req, res) => {
+  try {
+    const { count } = req.body;
+    let deleted = 0;
+    if (count === 'all') {
+      const result = await Order.deleteMany({});
+      deleted = result.deletedCount;
+    } else {
+      const n = parseInt(count);
+      if (!n || n <= 0) return res.status(400).json({ message: 'Invalid count' });
+      const oldest = await Order.find({}).sort({ createdAt: 1 }).limit(n).select('_id').lean();
+      const ids = oldest.map(o => o._id);
+      const result = await Order.deleteMany({ _id: { $in: ids } });
+      deleted = result.deletedCount;
+    }
+    res.json({ message: `${deleted} orders deleted` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// DELETE /api/orders/:id — Admin can delete any order; staff only completed
 router.delete('/:id', protect, restrictTo('staff', 'admin'), async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
-    if (order.status !== 'completed')
+    if (req.user.role !== 'admin' && order.status !== 'completed')
       return res.status(400).json({ message: 'Only completed orders can be deleted' });
 
     await Order.findByIdAndDelete(req.params.id);
@@ -141,7 +182,7 @@ router.get('/stats', protect, restrictTo('admin'), async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [total, pending, inProgress, completed, revenue] = await Promise.all([
+    const [total, pending, inProgress, completed, revenue, totalRevenue] = await Promise.all([
       Order.countDocuments({ createdAt: { $gte: today } }),
       Order.countDocuments({ createdAt: { $gte: today }, status: 'pending' }),
       Order.countDocuments({ createdAt: { $gte: today }, status: 'in-progress' }),
@@ -150,11 +191,16 @@ router.get('/stats', protect, restrictTo('admin'), async (req, res) => {
         { $match: { createdAt: { $gte: today }, status: 'completed' } },
         { $group: { _id: null, total: { $sum: '$totalAmount' } } },
       ]),
+      Order.aggregate([
+        { $match: { status: 'completed' } },
+        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+      ]),
     ]);
 
     res.json({
       today: { total, pending, inProgress, completed },
       revenue: revenue[0]?.total || 0,
+      totalRevenue: totalRevenue[0]?.total || 0,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

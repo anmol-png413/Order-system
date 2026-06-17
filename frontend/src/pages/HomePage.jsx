@@ -28,9 +28,7 @@ export default function HomePage() {
   const closeModal = () => setSelected(null);
 
   const handleAddToCart = () => {
-    addToCart(selected, qty);
-    toast.success(`${selected.name} added to cart`);
-    closeModal();
+    navigate('/login');
   };
 
   return (
@@ -44,6 +42,13 @@ export default function HomePage() {
             </div>
             <span className="font-bold text-white text-lg" style={{ fontFamily: 'Sora, sans-serif' }}>Green Sweets</span>
           </div>
+          <button
+            onClick={() => navigate('/login')}
+            className="text-sm font-semibold text-zinc-400 hover:text-white border border-zinc-700 hover:border-zinc-500 px-4 py-2 rounded-xl transition-all mr-2"
+            style={{ fontFamily: 'Sora, sans-serif' }}
+          >
+            Login
+          </button>
           <button
             onClick={() => navigate('/cart')}
             className="relative p-2 text-zinc-400 hover:text-white transition-colors"

@@ -10,6 +10,13 @@ import PackingPage from './pages/PackingPage';
 import CounterPage from './pages/CounterPage';
 import AdminPage from './pages/AdminPage';
 
+const PrivateRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="h-screen flex items-center justify-center text-zinc-400 font-display text-lg">Loading…</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+};
+
 const RoleRoute = ({ allowed, children }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="h-screen flex items-center justify-center text-zinc-400 font-display text-lg">Loading…</div>;
@@ -31,8 +38,8 @@ export default function App() {
             }}
           />
           <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/cart" element={<CartPage />} />
+            <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
+            <Route path="/cart" element={<PrivateRoute><CartPage /></PrivateRoute>} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/staff" element={<RoleRoute allowed={['staff', 'admin']}><StaffPage /></RoleRoute>} />
             <Route path="/packing" element={<RoleRoute allowed={['packing', 'admin', 'staff', 'counter']}><PackingPage /></RoleRoute>} />

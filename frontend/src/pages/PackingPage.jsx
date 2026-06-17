@@ -10,7 +10,11 @@ import { Bell, CheckCircle, Loader2, Package, Clock, ShoppingCart } from 'lucide
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
 function fmtUnit(item) {
-  if (item.quantityLabel) return item.quantityLabel;
+  if (item.quantityLabel) {
+    // Show weight × quantity (e.g., "500g × 2 Box")
+    const label = item.quantity > 1 ? `${item.quantityLabel} × ${item.quantity}` : item.quantityLabel;
+    return `${label} Box`;
+  }
   if (item.unit === 'piece') return `${item.quantity} pcs`;
   return `${item.quantity} kg`;
 }
@@ -179,13 +183,15 @@ export default function PackingPage() {
                   }`}>
 
                   {/* LEFT — Token + time */}
-                  <div className={`flex flex-col items-center justify-center px-2.5 py-2 min-w-[58px] flex-shrink-0 ${
+                  <div className={`flex flex-col items-center justify-center py-2 w-[72px] flex-shrink-0 overflow-hidden ${
                     isInProgress ? 'bg-yellow-500' : isPending ? 'bg-orange-500' : 'bg-green-500'
                   }`}>
                     <span className={`text-[9px] font-bold uppercase tracking-wider ${isInProgress ? 'text-yellow-900' : isPending ? 'text-orange-950' : 'text-green-900'}`}>
                       TOKEN
                     </span>
-                    <span className={`text-2xl font-black leading-none ${isInProgress ? 'text-yellow-950' : isPending ? 'text-white' : 'text-green-950'}`}
+                    <span className={`font-black leading-none w-full text-center ${
+                      String(order.tokenNumber).length > 2 ? 'text-2xl' : 'text-3xl'
+                    } ${isInProgress ? 'text-yellow-950' : isPending ? 'text-white' : 'text-green-950'}`}
                       style={{ fontFamily: 'Sora, sans-serif' }}>
                       {order.tokenNumber}
                     </span>
@@ -244,21 +250,20 @@ export default function PackingPage() {
                     </div>
 
                     {/* Products horizontal scroll */}
-                    <div className="flex gap-2 px-3 py-2 overflow-x-auto">
+                    <div className="flex gap-3 px-3 py-2 overflow-x-auto">
                       {order.items.map((item, idx) => (
-                        <div key={idx} className="flex flex-col items-center flex-shrink-0 w-16">
-                          <div className="w-16 h-16 rounded-xl bg-zinc-800 overflow-hidden mb-1">
+                        <div key={idx} className="flex flex-col items-center flex-shrink-0 w-24">
+                          <div className="w-24 h-24 rounded-xl bg-zinc-800 overflow-hidden mb-2">
                             <img
                               src={item.image || IMG_FALLBACK}
                               alt={item.name}
                               loading="lazy"
-                              width="48" height="48"
+                              width="96" height="96"
                               className="w-full h-full object-cover"
                               onError={e => { e.target.src = IMG_FALLBACK; }}
                             />
                           </div>
-                          <p className="text-zinc-200 text-[11px] font-semibold text-center leading-tight line-clamp-2 w-full">{item.name}</p>
-                          <p className="text-orange-400 text-[11px] font-bold mt-0.5">{fmtUnit(item)}</p>
+                          <p className="text-orange-400 text-sm font-bold mt-0.5">{fmtUnit(item)}</p>
                         </div>
                       ))}
                     </div>

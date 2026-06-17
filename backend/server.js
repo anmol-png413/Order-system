@@ -29,6 +29,7 @@ const io = new Server(server, {
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
+app.use(require('cookie-parser')());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Make io accessible in routes
@@ -42,18 +43,35 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/orders', require('./routes/orders'));
 
-// Socket.io connection
+// Socket.io — global auth middleware (runs before any connection is accepted)
+const jwt = require('jsonwebtoken');
+const ALLOWED_ROOMS = ['packing', 'admin', 'counter', 'staff'];
+
+io.use((socket, next) => {
+  // Read token from httpOnly cookie or fallback to auth header
+  let token = null;
+  const cookieHeader = socket.handshake.headers.cookie || '';
+  const cookieMatch = cookieHeader.split(';').find(c => c.trim().startsWith('token='));
+  if (cookieMatch) token = cookieMatch.trim().split('=')[1];
+  if (!token) token = socket.handshake.auth?.token;
+
+  if (!token) return next(new Error('Authentication required'));
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = decoded;
+    next();
+  } catch {
+    next(new Error('Invalid or expired token'));
+  }
+});
+
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-
   socket.on('join-room', (room) => {
+    if (!ALLOWED_ROOMS.includes(room)) return;
     socket.join(room);
-    console.log(`Socket ${socket.id} joined room: ${room}`);
   });
 
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
+  socket.on('disconnect', () => {});
 });
 
 // Sync token counter with the highest existing tokenNumber in DB

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { ShoppingCart, Plus, Minus, X } from 'lucide-react';
+import { ShoppingCart, ShoppingBag, Plus, Minus, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" fill="%231a1a1a"/><text x="60" y="68" text-anchor="middle" font-size="40" fill="%23444">🍽️</text></svg>';

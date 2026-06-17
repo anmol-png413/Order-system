@@ -101,21 +101,8 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-zinc-800">
-            <p className="text-xs text-zinc-600 text-center">Demo accounts (after seeding)</p>
-            <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs text-zinc-500">
-              {[
-                ['admin',          'admin',    'admin123'],
-                ['Order Counter',  'staff1',   'staff123'],
-                ['Packing',        'packer1',  'packer123'],
-                // ['Pickup Counter', 'counter1', 'counter123'],
-              ].map(([label, u, p]) => (
-                <button key={label} onClick={() => setForm({ username: u, password: p })}
-                  className="text-left bg-zinc-800/60 hover:bg-zinc-800 rounded-lg px-3 py-1.5 transition-colors">
-                  <span className="text-orange-400 font-medium">{label}</span>
-                </button>
-              ))}
-            </div>
+          <div className="mt-6 pt-5 border-t border-zinc-800 text-center">
+            <p className="text-xs text-zinc-600">Contact admin for login credentials</p>
           </div>
         </div>
       </div>

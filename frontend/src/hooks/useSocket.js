@@ -10,7 +10,14 @@ export const useSocket = (room, handlers = {}) => {
   useEffect(() => {
     if (!socketInstance) {
       const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
-      socketInstance = io(backendUrl, { withCredentials: true, transports: ['websocket', 'polling'] });
+      socketInstance = io(backendUrl, {
+        withCredentials: true, // httpOnly cookie auto-sent in handshake
+        transports: ['websocket', 'polling'],
+      });
+
+      socketInstance.on('connect_error', (err) => {
+        console.warn('Socket connection failed:', err.message);
+      });
     }
 
     const socket = socketInstance;

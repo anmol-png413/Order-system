@@ -11,6 +11,7 @@ const productSchema = new mongoose.Schema(
     sortOrder: { type: Number, default: 0 },
     unit: { type: String, enum: ['kg', 'piece'], default: 'kg' },
     orderCount: { type: Number, default: 0 },
+    isDeleted: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

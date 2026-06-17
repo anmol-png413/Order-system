@@ -35,6 +35,7 @@ export default function App() {
             toastOptions={{
               style: { background: '#1a1a1a', color: '#f5f5f5', border: '1px solid #2e2e2e', borderRadius: '12px', fontFamily: 'DM Sans, sans-serif' },
               success: { iconTheme: { primary: '#f97316', secondary: '#fff' } },
+              ariaProps: { role: 'status', 'aria-live': 'polite' },
             }}
           />
           <Routes>
@@ -42,8 +43,8 @@ export default function App() {
             <Route path="/cart" element={<PrivateRoute><CartPage /></PrivateRoute>} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/staff" element={<RoleRoute allowed={['staff', 'admin']}><StaffPage /></RoleRoute>} />
-            <Route path="/packing" element={<RoleRoute allowed={['packing', 'admin', 'staff', 'counter']}><PackingPage /></RoleRoute>} />
-            <Route path="/counter" element={<RoleRoute allowed={['counter', 'admin', 'staff', 'packing']}><CounterPage /></RoleRoute>} />
+            <Route path="/packing" element={<RoleRoute allowed={['packing', 'admin']}><PackingPage /></RoleRoute>} />
+            <Route path="/counter" element={<RoleRoute allowed={['counter', 'admin']}><CounterPage /></RoleRoute>} />
             <Route path="/admin" element={<RoleRoute allowed={['admin']}><AdminPage /></RoleRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

@@ -7,6 +7,7 @@ const orderItemSchema = new mongoose.Schema({
   price: { type: Number, required: true },
   quantity: { type: Number, required: true, min: 1 },
   image: { type: String },
+  unit: { type: String, default: 'kg' },
   quantityLabel: { type: String, default: '' },
 }, { _id: false }); // no _id per item — saves ~12 bytes × items × orders
 
@@ -42,6 +43,7 @@ const orderSchema = new mongoose.Schema(
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ packedAt: -1 }); // counter page: last 2 hours filter
+orderSchema.index({ 'bulk.phone': 1 }); // customer history lookup by phone
 
 // Atomic token number — daily reset (1, 2, 3... resets to 1 next day)
 orderSchema.pre('save', async function (next) {

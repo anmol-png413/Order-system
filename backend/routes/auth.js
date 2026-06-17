@@ -1,14 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const { protect, restrictTo } = require('../middleware/auth');
 
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
+// Max 10 login attempts per IP per 15 minutes
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many login attempts. Please try again after 15 minutes.' },
+  skipSuccessfulRequests: true, // successful logins don't count against limit
+});
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+};
+
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password)
@@ -19,13 +37,22 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
 
     const token = signToken(user._id);
+
+    // Set token in httpOnly cookie (JS se access nahi hoga)
+    res.cookie('token', token, COOKIE_OPTIONS);
+
     res.json({
-      token,
       user: { id: user._id, name: user.name, username: user.username, role: user.role },
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+});
+
+// POST /api/auth/logout
+router.post('/logout', (req, res) => {
+  res.clearCookie('token', COOKIE_OPTIONS);
+  res.json({ message: 'Logged out' });
 });
 
 // GET /api/auth/me
@@ -76,9 +103,14 @@ router.delete('/users/:id', protect, restrictTo('admin'), async (req, res) => {
   }
 });
 
-// POST /api/auth/seed — One-time admin setup
+// POST /api/auth/seed — One-time setup, requires SEED_SECRET from env
 router.post('/seed', async (req, res) => {
   try {
+    const secret = req.headers['x-seed-secret'];
+    if (!secret || secret !== process.env.SEED_SECRET) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
     const count = await User.countDocuments();
     if (count > 0) return res.status(400).json({ message: 'Database already seeded' });
 

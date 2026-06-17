@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useSocket } from '../hooks/useSocket';
 import {
@@ -9,6 +8,15 @@ import {
   Search, Printer, Package, Bell, ChevronDown, Clock,
   Phone, Calendar, Wallet, Tag, Users
 } from 'lucide-react';
+import {
+  IMG_FALLBACK, parseWeightToKg,
+  buildCustomerSlipHTML, buildInternalReceiptHTML,
+  writeAndPrint, printSlip,
+} from '../utils/printUtils';
+import BulkOrderModal from '../components/staff/BulkOrderModal';
+import StatusModal from '../components/staff/StatusModal';
+import CartPanel from '../components/staff/CartPanel';
+import { getThumbUrl, getFullUrl } from '../utils/imageUtils';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
@@ -509,11 +517,11 @@ function CartPanel({ cart, notes, setNotes, discountPercent, setDiscountPercent,
 
 // ── Main Component ───────────────────────────────────────────────
 export default function StaffPage() {
-  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(['All']);
   const [activeCategory, setActiveCategory] = useState('All');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [cart, setCart] = useState([]);
   const [notes, setNotes] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
@@ -539,7 +547,13 @@ export default function StaffPage() {
   // Live orders
   const [liveOrders, setLiveOrders] = useState([]);
   const [deleting, setDeleting] = useState(null);
+  const [markingPaid, setMarkingPaid] = useState(null);
   const [showFloating, setShowFloating] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const fetchLiveOrders = useCallback(() => {
     axios.get('/api/orders').then(res => setLiveOrders(res.data)).catch(() => {});
@@ -570,7 +584,9 @@ export default function StaffPage() {
       setCategories(allowed.length > 1 ? allowed : cats);
     }).catch(() => toast.error('Failed to load products'))
       .finally(() => setLoading(false));
-  }, []);
+    const interval = setInterval(fetchLiveOrders, 3000);
+    return () => clearInterval(interval);
+  }, [fetchLiveOrders]);
 
   useSocket('staff', {
     'new-order': (order) => { setLiveOrders(prev => [order, ...prev]); },
@@ -591,12 +607,25 @@ export default function StaffPage() {
     }
   };
 
+  const markBalancePaid = async (orderId) => {
+    setMarkingPaid(orderId);
+    try {
+      const res = await axios.patch(`/api/orders/${orderId}/mark-paid`);
+      setLiveOrders(prev => prev.map(o => o._id === orderId ? res.data : o));
+      toast.success('Balance collected!', { icon: '💰' });
+    } catch {
+      toast.error('Failed to collect balance');
+    } finally {
+      setMarkingPaid(null);
+    }
+  };
+
   const packingCount = liveOrders.filter(o => o.status === 'pending' || o.status === 'in-progress').length;
   const readyCount   = liveOrders.filter(o => o.status === 'completed').length;
 
   const filtered = products.filter(p => {
     const inCat = activeCategory === 'All' || p.category === activeCategory;
-    const inSearch = p.name.toLowerCase().includes(search.toLowerCase());
+    const inSearch = p.name.toLowerCase().includes(debouncedSearch.toLowerCase());
     return inCat && inSearch;
   }).sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0));
 
@@ -707,12 +736,12 @@ export default function StaffPage() {
         </button>
       </div>
 
-      {/* ── SUCCESS MODAL ── */}
+      {/* Success Modal */}
       {successData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-gradient-to-br from-orange-500 via-orange-500 to-pink-500" />
-          <button onClick={() => setSuccessData(null)} className="absolute top-5 right-5 w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white">
-            <X className="w-5 h-5" />
+          <button onClick={() => setSuccessData(null)} className="absolute top-5 right-5 w-10 h-10 bg-white/30 hover:bg-white/50 rounded-full flex items-center justify-center text-white font-bold text-lg">
+            ✕
           </button>
           <div className="relative text-center max-w-xs w-full animate-pop">
             <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -739,8 +768,8 @@ export default function StaffPage() {
                 <Bell className="w-4 h-4" /> Counter Status
               </button>
               <button onClick={() => setSuccessData(null)}
-                className="flex items-center gap-2 bg-white/20 hover:bg-white/30 border border-white/30 text-white font-semibold px-4 py-3 rounded-xl transition-all text-sm">
-                New Order
+                className="flex items-center gap-2 bg-white text-orange-500 hover:bg-white/90 font-bold px-6 py-3 rounded-xl transition-all text-sm shadow-lg">
+                ✕ Close &amp; New Order
               </button>
             </div>
           </div>
@@ -764,7 +793,7 @@ export default function StaffPage() {
         />
       )}
 
-      {/* ── PRODUCT MODAL ── */}
+      {/* Product Modal */}
       {modalProduct && (
         <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-start justify-center px-4 pb-4 pt-20 overflow-y-auto" onClick={() => setModalProduct(null)}>
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm flex flex-col animate-slide-up relative" onClick={e => e.stopPropagation()}>
@@ -814,6 +843,15 @@ export default function StaffPage() {
                     <span className="text-white font-bold text-xl w-10 text-center" style={{ fontFamily: 'Sora, sans-serif' }}>{modalQty}</span>
                     <button onClick={() => setModalQty(q => q + 1)} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300"><Plus className="w-4 h-4" /></button>
                   </div>
+                  <input
+                    type="number"
+                    value={modalQty === 0 ? '' : modalQty}
+                    onChange={e => setModalQty(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
+                    onBlur={() => { if (!modalQty || modalQty < 1) setModalQty(1); }}
+                    placeholder="Type quantity e.g. 500"
+                    min="1"
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-lg focus:outline-none focus:border-orange-500"
+                  />
                 </div>
               )}
             </div>
@@ -911,7 +949,7 @@ export default function StaffPage() {
         </div>
       </main>
 
-      {/* ── MOBILE CART DRAWER ── */}
+      {/* Mobile Cart Drawer */}
       <div className="sm:hidden">
         <button onClick={() => setCartOpen(true)}
           className="fixed bottom-6 right-4 z-30 bg-orange-500 text-white rounded-2xl px-5 py-3.5 flex items-center gap-3 shadow-2xl shadow-orange-900/50 active:scale-95 transition-all">

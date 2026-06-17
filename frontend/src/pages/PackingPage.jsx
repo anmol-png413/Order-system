@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../hooks/useSocket';
-import { Bell, CheckCircle, Loader2, Package, Clock, ShoppingCart } from 'lucide-react';
+import { Bell, CheckCircle, Loader2, Package, Clock, ShoppingCart, Users, Phone, Calendar, Wallet } from 'lucide-react';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
@@ -16,6 +16,10 @@ function fmtUnit(item) {
     return `${label} Box`;
   }
   if (item.unit === 'piece') return `${item.quantity} pcs`;
+  if (item.quantityLabel) {
+    const label = item.quantity > 1 ? `${item.quantityLabel} × ${item.quantity}` : item.quantityLabel;
+    return `${label} Box`;
+  }
   return `${item.quantity} kg`;
 }
 
@@ -44,18 +48,22 @@ export default function PackingPage() {
     return `${Math.floor(mins / 60)}h`;
   };
 
-  const fetchOrders = useCallback(() => {
+  const fetchOrders = useCallback((showError = false) => {
     axios.get('/api/orders').then(res => {
       setOrders(res.data);
-    }).catch(() => toast.error('Failed to fetch orders'))
+    }).catch(() => { if (showError) toast.error('Failed to fetch orders'); })
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    fetchOrders(true);
+    const interval = setInterval(() => fetchOrders(false), 3000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
 
   useSocket('packing', {
     'new-order': (order) => {
-      setOrders(prev => [order, ...prev]);
+      setOrders(prev => prev.find(o => o._id === order._id) ? prev : [order, ...prev]);
       toast.success(`New order! Token #${order.tokenNumber}`, { duration: 5000, icon: '🔔' });
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -209,7 +217,7 @@ export default function PackingPage() {
                       : isPending ? 'border-orange-500/30 bg-orange-500/10'
                       : 'border-green-500/20 bg-green-500/10'
                     }`}>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {isInProgress
                           ? <Loader2 className="w-3 h-3 text-yellow-400 animate-spin" />
                           : isPending
@@ -220,6 +228,9 @@ export default function PackingPage() {
                         }`}>
                           {isInProgress ? 'IN PROGRESS' : isPending ? 'PENDING' : 'DONE'}
                         </span>
+                        {isInProgress && order.packedBy?.name && (
+                          <span className="text-[10px] text-yellow-400/70 font-medium">· {order.packedBy.name}</span>
+                        )}
                       </div>
 
                       {/* Action button */}
@@ -271,6 +282,40 @@ export default function PackingPage() {
                     {order.notes && (
                       <div className="mx-3 mb-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-2.5 py-1.5">
                         <p className="text-xs text-yellow-300">📝 {order.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Bulk order details */}
+                    {(order.bulk?.phone || order.bulk?.customerName) && (
+                      <div className="mx-3 mb-2 bg-purple-500/10 border border-purple-500/25 rounded-lg px-3 py-2 flex flex-wrap gap-x-4 gap-y-1">
+                        {order.bulk.customerName && (
+                          <span className="flex items-center gap-1 text-xs text-purple-200 font-semibold">
+                            <Users className="w-3 h-3 text-purple-400" /> {order.bulk.customerName}
+                          </span>
+                        )}
+                        {order.bulk.phone && (
+                          <span className="flex items-center gap-1 text-xs text-purple-300">
+                            <Phone className="w-3 h-3 text-purple-400" /> {order.bulk.phone}
+                          </span>
+                        )}
+                        {order.bulk.schedule && (
+                          <span className="flex items-center gap-1 text-xs text-orange-300 font-semibold">
+                            <Calendar className="w-3 h-3 text-orange-400" />
+                            {new Date(order.bulk.schedule).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </span>
+                        )}
+                        {order.bulk.advance > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-green-300">
+                            <Wallet className="w-3 h-3 text-green-400" />
+                            Adv: ₹{order.bulk.advance?.toFixed(0)}
+                            {order.bulk.balance > 0 && !order.bulk.balancePaid && (
+                              <span className="text-yellow-300 ml-1">| Due: ₹{order.bulk.balance?.toFixed(0)}</span>
+                            )}
+                            {order.bulk.balancePaid && (
+                              <span className="text-green-400 ml-1">✓ Paid</span>
+                            )}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

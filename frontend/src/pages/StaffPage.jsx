@@ -209,6 +209,7 @@ export default function StaffPage() {
       }
       const res = await axios.post('/api/orders', payload);
       const orderData = { token: res.data.tokenNumber, items: [...cart], notes };
+      setLiveOrders(prev => [res.data, ...prev]);
       setSuccessData(orderData);
       if (printWin && !printWin.closed)       writeAndPrint(printWin,    buildCustomerSlipHTML(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk));
       if (internalWin && !internalWin.closed) writeAndPrint(internalWin, buildInternalReceiptHTML(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk));

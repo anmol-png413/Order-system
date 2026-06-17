@@ -95,6 +95,7 @@ router.post('/', async (req, res) => {
 
     req.io.to('packing').emit('new-order', order);
     req.io.to('admin').emit('new-order', order);
+    req.io.to('staff').emit('new-order', order);
 
     res.status(201).json(order);
   } catch (err) {

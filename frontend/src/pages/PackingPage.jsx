@@ -54,7 +54,7 @@ export default function PackingPage() {
 
   useSocket('packing', {
     'new-order': (order) => {
-      setOrders(prev => [order, ...prev]);
+      setOrders(prev => prev.find(o => o._id === order._id) ? prev : [order, ...prev]);
       toast.success(`New order! Token #${order.tokenNumber}`, { duration: 5000, icon: '🔔' });
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();

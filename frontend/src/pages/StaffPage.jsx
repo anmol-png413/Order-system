@@ -101,7 +101,7 @@ export default function StaffPage() {
   }, []);
 
   useSocket('staff', {
-    'new-order':     (order)   => setLiveOrders(prev => [order, ...prev]),
+    'new-order':     (order)   => setLiveOrders(prev => prev.find(o => o._id === order._id) ? prev : [order, ...prev]),
     'order-updated': (updated) => setLiveOrders(prev => prev.map(o => o._id === updated._id ? updated : o)),
     'order-deleted': ({ _id }) => setLiveOrders(prev => prev.filter(o => o._id !== _id)),
   });
@@ -209,7 +209,6 @@ export default function StaffPage() {
       }
       const res = await axios.post('/api/orders', payload);
       const orderData = { token: res.data.tokenNumber, items: [...cart], notes };
-      setLiveOrders(prev => [res.data, ...prev]);
       setSuccessData(orderData);
       if (printWin && !printWin.closed)       writeAndPrint(printWin,    buildCustomerSlipHTML(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk));
       if (internalWin && !internalWin.closed) writeAndPrint(internalWin, buildInternalReceiptHTML(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk));

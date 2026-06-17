@@ -27,8 +27,10 @@ router.get('/', protect, async (req, res) => {
       const end = new Date(d);
       end.setHours(23, 59, 59, 999);
       filter.createdAt = { $gte: d, $lte: end };
+    } else if (req.user.role === 'packing') {
+      // 24-hour rolling window — prevents midnight data wipe on packing screen
+      filter.createdAt = { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) };
     } else if (req.user.role !== 'admin') {
-      // Default: today's orders
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       filter.createdAt = { $gte: today };

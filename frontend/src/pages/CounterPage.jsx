@@ -5,14 +5,11 @@ import Navbar from '../components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import { CheckCircle, Clock, Package, Bell, Printer, ShoppingCart } from 'lucide-react';
+import { buildSlipHTML, writeAndPrint } from '../utils/printUtils';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
 function fmtUnit(item) {
-  if (item.quantityLabel) {
-    // Show weight × quantity (e.g., "500g × 2")
-    return item.quantity > 1 ? `${item.quantityLabel} × ${item.quantity}` : item.quantityLabel;
-  }
   if (item.unit === 'piece') return `${item.quantity} pcs`;
   if (item.quantityLabel) {
     return item.quantity > 1 ? `${item.quantityLabel} × ${item.quantity}` : item.quantityLabel;
@@ -21,43 +18,10 @@ function fmtUnit(item) {
 }
 
 function printSlip(order) {
-  const now = new Date(order.packedAt || order.createdAt);
   const win = window.open('', '_blank', 'width=320,height=640');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Courier New',monospace;width:290px;margin:auto;padding:12px;font-size:13px}
-    .center{text-align:center}.bold{font-weight:bold}
-    .big{font-size:32px;font-weight:900;letter-spacing:2px}
-    .line{border-top:1px dashed #555;margin:8px 0}
-    table{width:100%;border-collapse:collapse}
-    td{padding:3px 0;vertical-align:top}
-    .right{text-align:right}
-    .total-row td{font-weight:bold;font-size:15px;padding-top:6px}
-  </style></head><body>
-  <div class="center bold" style="font-size:20px;letter-spacing:1px">Green Sweets</div>
-  <div class="center" style="font-size:11px">${now.toLocaleDateString('en-IN')} &nbsp; ${now.toLocaleTimeString('en-IN')}</div>
-  <div class="line"></div>
-  <div class="center bold" style="font-size:11px;letter-spacing:3px">TOKEN NUMBER</div>
-  <div class="center big">#${order.tokenNumber}</div>
-  <div class="line"></div>
-  <table>
-    <tr><td class="bold" style="font-size:11px">ITEM</td><td class="right bold" style="font-size:11px">AMT</td></tr>
-    <tr><td colspan="2"><div class="line"></div></td></tr>
-    ${order.items.map(i => `<tr>
-      <td style="font-size:12px">${i.name}<br>
-        <span style="color:#555;font-size:11px">${fmtUnit(i)} @ ₹${i.price.toFixed(2)}</span></td>
-      <td class="right">₹${(i.price * i.quantity).toFixed(2)}</td>
-    </tr>`).join('')}
-    <tr><td colspan="2"><div class="line"></div></td></tr>
-    <tr class="total-row"><td>TOTAL</td><td class="right">₹${order.totalAmount.toFixed(2)}</td></tr>
-  </table>
-  <div class="line"></div>
-  <div class="center" style="font-size:12px;font-weight:bold">✓ READY FOR PICKUP</div>
-  <div class="center" style="font-size:11px;margin-top:4px">Thank you! Visit again</div>
-  </body></html>`);
-  win.document.close();
-  setTimeout(() => win.print(), 300);
+  if (!win) return;
+  const html = buildSlipHTML(order.tokenNumber, order.items, order.notes);
+  writeAndPrint(win, html);
 }
 
 export default function CounterPage() {

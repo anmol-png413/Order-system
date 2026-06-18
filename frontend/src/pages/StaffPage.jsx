@@ -13,11 +13,6 @@ import {
   buildSlipHTML, buildCustomerSlipHTML, buildInternalReceiptHTML,
   writeAndPrint, printSlip,
 } from '../utils/printUtils';
-import BulkOrderModal from '../components/staff/BulkOrderModal';
-import StatusModal from '../components/staff/StatusModal';
-import CartPanel from '../components/staff/CartPanel';
-import { getThumbUrl, getFullUrl } from '../utils/imageUtils';
-
 function fmtQty(quantity, quantityLabel, unit) {
   if (unit === 'piece') return `${quantity} pcs`;
   if (quantityLabel) {

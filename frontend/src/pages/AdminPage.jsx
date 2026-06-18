@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
-import { useSocket } from '../hooks/useSocket';
-import { Plus, Edit2, Trash2, X, BarChart3, Package, Users, ShoppingBag, Upload, Eye, EyeOff, AlertTriangle, ClipboardList, Clock, Phone, Calendar, Wallet, TrendingUp, Award, Layers } from 'lucide-react';
-import { getThumbUrl } from '../utils/imageUtils';
+import { Plus, Edit2, Trash2, X, BarChart3, Package, Users, ShoppingBag, Upload, Eye, EyeOff, AlertTriangle, ClipboardList, Clock, Phone, Calendar, Wallet } from 'lucide-react';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
@@ -625,10 +623,10 @@ export default function AdminPage() {
             ) : (
               <div className="space-y-2">
                 {orders.map(order => (
-                  <div key={order._id} className={`card px-3 py-3 flex items-start gap-3 ${(order.bulk?.phone || order.bulk?.customerName) ? 'border-purple-500/30 bg-purple-500/5' : ''}`}>
+                  <div key={order._id} className={`card px-3 py-3 flex items-start gap-3 ${order.bulk?.phone ? 'border-purple-500/30 bg-purple-500/5' : ''}`}>
                     {/* Token */}
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${(order.bulk?.phone || order.bulk?.customerName) ? 'bg-purple-500/20' : 'bg-zinc-800'}`}>
-                      <span className={`font-extrabold text-sm ${(order.bulk?.phone || order.bulk?.customerName) ? 'text-purple-300' : 'text-white'}`} style={{ fontFamily: 'Sora, sans-serif' }}>
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${order.bulk?.phone ? 'bg-purple-500/20' : 'bg-zinc-800'}`}>
+                      <span className={`font-extrabold text-sm ${order.bulk?.phone ? 'text-purple-300' : 'text-white'}`} style={{ fontFamily: 'Sora, sans-serif' }}>
                         #{order.tokenNumber}
                       </span>
                     </div>
@@ -648,19 +646,12 @@ export default function AdminPage() {
                         ))}
                       </div>
 
-                      {/* Bulk info */}
-                      {(order.bulk?.phone || order.bulk?.customerName) && (
+                      {/* Bulk order info */}
+                      {order.bulk?.phone && (
                         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                          {order.bulk.customerName && (
-                            <span className="flex items-center gap-1 text-xs text-purple-200 font-semibold">
-                              <Users className="w-3 h-3" /> {order.bulk.customerName}
-                            </span>
-                          )}
-                          {order.bulk.phone && (
                           <span className="flex items-center gap-1 text-xs text-purple-300 font-medium">
                             <Phone className="w-3 h-3" /> {order.bulk.phone}
                           </span>
-                          )}
                           {order.bulk.schedule && (
                             <span className="flex items-center gap-1 text-xs text-orange-300 font-semibold">
                               <Calendar className="w-3 h-3" />
@@ -685,8 +676,10 @@ export default function AdminPage() {
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[order.status]}`}>
                           {order.status}
                         </span>
-                        {(order.bulk?.phone || order.bulk?.customerName) && (
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400">BULK</span>
+                        {order.bulk?.phone && (
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400">
+                            BULK
+                          </span>
                         )}
                       </div>
                     </div>

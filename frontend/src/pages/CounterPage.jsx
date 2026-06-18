@@ -9,6 +9,10 @@ import { CheckCircle, Clock, Package, Bell, Printer, ShoppingCart } from 'lucide
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
 function fmtUnit(item) {
+  if (item.quantityLabel) {
+    // Show weight × quantity (e.g., "500g × 2")
+    return item.quantity > 1 ? `${item.quantityLabel} × ${item.quantity}` : item.quantityLabel;
+  }
   if (item.unit === 'piece') return `${item.quantity} pcs`;
   if (item.quantityLabel) {
     return item.quantity > 1 ? `${item.quantityLabel} × ${item.quantity}` : item.quantityLabel;

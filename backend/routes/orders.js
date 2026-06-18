@@ -75,7 +75,6 @@ router.post('/', async (req, res) => {
     const payableAmount = +(totalAmount - discountAmount).toFixed(2);
 
     const bulkInfo = bulk ? {
-      customerName: (bulk.customerName || '').trim(),
       phone: bulk.phone || '',
       advance: Number(bulk.advance) || 0,
       schedule: bulk.schedule ? new Date(bulk.schedule) : undefined,
@@ -133,24 +132,6 @@ router.patch('/:id/status', protect, restrictTo('packing', 'admin'), async (req,
     req.io.to('admin').emit('order-updated', order);
     req.io.to('staff').emit('order-updated', order);
 
-    res.json(order);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// PATCH /api/orders/:id/mark-paid — Collect outstanding bulk order balance
-router.patch('/:id/mark-paid', protect, restrictTo('staff', 'counter', 'packing', 'admin'), async (req, res) => {
-  try {
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { 'bulk.balancePaid': true },
-      { new: true }
-    ).populate('createdBy', 'name').populate('packedBy', 'name');
-    if (!order) return res.status(404).json({ message: 'Order not found' });
-    req.io.to('counter').emit('order-updated', order);
-    req.io.to('staff').emit('order-updated', order);
-    req.io.to('admin').emit('order-updated', order);
     res.json(order);
   } catch (err) {
     res.status(500).json({ message: err.message });

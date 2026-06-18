@@ -27,12 +27,10 @@ const orderSchema = new mongoose.Schema(
     discountAmount: { type: Number, default: 0 },
     payableAmount: { type: Number, default: 0 },
     bulk: {
-      customerName: { type: String, default: '' },
       phone: { type: String, default: '' },
       advance: { type: Number, default: 0 },
       schedule: { type: Date },
       balance: { type: Number, default: 0 },
-      balancePaid: { type: Boolean, default: false },
     },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     packedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

@@ -304,18 +304,6 @@ export default function PackingPage() {
                             {new Date(order.bulk.schedule).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </span>
                         )}
-                        {order.bulk.advance > 0 && (
-                          <span className="flex items-center gap-1 text-xs text-green-300">
-                            <Wallet className="w-3 h-3 text-green-400" />
-                            Adv: ₹{order.bulk.advance?.toFixed(0)}
-                            {order.bulk.balance > 0 && !order.bulk.balancePaid && (
-                              <span className="text-yellow-300 ml-1">| Due: ₹{order.bulk.balance?.toFixed(0)}</span>
-                            )}
-                            {order.bulk.balancePaid && (
-                              <span className="text-green-400 ml-1">✓ Paid</span>
-                            )}
-                          </span>
-                        )}
                       </div>
                     )}
                   </div>

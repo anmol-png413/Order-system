@@ -7,6 +7,7 @@ import { Eye, EyeOff } from 'lucide-react';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+
   const [form, setForm] = useState({ username: '', password: '' });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);

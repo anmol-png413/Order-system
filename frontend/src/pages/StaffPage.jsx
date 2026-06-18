@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar';
 import { useSocket } from '../hooks/useSocket';
 import {
   Plus, Minus, Trash2, ShoppingCart, CheckCircle, X,
-  Search, Printer, Package, Bell, ChevronDown, Clock,
+  Printer, Package, Bell, ChevronDown, Clock,
   Phone, Calendar, Wallet, Tag, Users
 } from 'lucide-react';
 import {
@@ -30,8 +30,8 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
   const balance = +(payable - advance).toFixed(2);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-sm overflow-hidden animate-slide-up" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 py-4" onClick={onClose}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-sm flex flex-col animate-slide-up" style={{ maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 bg-purple-500/10">
           <div className="flex items-center gap-2">
@@ -48,7 +48,7 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
           {/* Name */}
           <div>
             <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2">
@@ -130,7 +130,7 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
           )}
         </div>
 
-        <div className="px-5 pb-5">
+        <div className="px-5 pb-5 flex-shrink-0 border-t border-zinc-800 pt-4">
           <button
             onClick={onClose}
             className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-colors"
@@ -219,12 +219,20 @@ function StatusModal({ type, orders, onClose, onDelete, deleting }) {
                     </p>
                   )}
                   {/* Bulk badge */}
-                  {order.bulk?.phone && (
+                  {(order.bulk?.phone || order.bulk?.customerName) && (
                     <div className="mb-2 bg-purple-500/10 border border-purple-500/20 rounded-lg px-2 py-1.5 space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <Users className="w-3 h-3 text-purple-400 flex-shrink-0" />
-                        <span className="text-xs text-purple-300 font-medium">{order.bulk.phone}</span>
-                      </div>
+                      {order.bulk.customerName && (
+                        <div className="flex items-center gap-1.5">
+                          <Users className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                          <span className="text-xs text-purple-200 font-semibold">{order.bulk.customerName}</span>
+                        </div>
+                      )}
+                      {order.bulk.phone && (
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3 h-3 text-purple-400 flex-shrink-0" />
+                          <span className="text-xs text-purple-300 font-medium">{order.bulk.phone}</span>
+                        </div>
+                      )}
                       {order.bulk.schedule && (
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3 h-3 text-orange-400 flex-shrink-0" />
@@ -274,107 +282,112 @@ function CartPanel({ cart, notes, setNotes, discountPercent, setDiscountPercent,
   const DISCOUNT_PRESETS = [0, 5, 10, 15, 20];
 
   return (
-    <>
-      {/* Items */}
-      <div className="overflow-y-auto p-3 space-y-2 flex-1" style={{ maxHeight: '38vh' }}>
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Scrollable area — items + form fields */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {cart.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-zinc-600 py-10">
             <ShoppingCart className="w-12 h-12 mb-3 opacity-20" />
             <p className="text-sm">Tap products to add</p>
           </div>
-        ) : cart.map((item, idx) => (
-          <div key={idx} className="flex items-center gap-3 bg-zinc-800/60 rounded-xl p-2.5">
-            <img src={item.image || IMG_FALLBACK} alt={item.name}
-              className="w-12 h-12 rounded-lg object-cover bg-zinc-700 flex-shrink-0"
-              onError={e => { e.target.src = IMG_FALLBACK; }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-zinc-200 truncate">{item.name}</p>
-              <p className="text-xs text-zinc-500">{item.quantityLabel || (item.unit === 'piece' ? `${item.quantity} pcs` : `${item.quantity} kg`)}</p>
-              <p className="text-xs text-orange-400 font-medium">₹{(item.price * item.quantity).toFixed(2)}</p>
+        ) : (
+          <>
+            {cart.map((item, idx) => (
+              <div key={idx} className="flex items-center gap-3 bg-zinc-800/60 rounded-xl p-2.5">
+                <img src={item.image || IMG_FALLBACK} alt={item.name}
+                  className="w-12 h-12 rounded-lg object-cover bg-zinc-700 flex-shrink-0"
+                  onError={e => { e.target.src = IMG_FALLBACK; }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-zinc-200 truncate">{item.name}</p>
+                  <p className="text-xs text-zinc-500">{item.quantityLabel || (item.unit === 'piece' ? `${item.quantity} pcs` : `${item.quantity} kg`)}</p>
+                  <p className="text-xs text-orange-400 font-medium">₹{(item.price * item.quantity).toFixed(2)}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => changeQty(idx, -1)} className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center"><Minus className="w-3 h-3 text-zinc-300" /></button>
+                  <span className="w-6 text-center text-sm font-bold text-white">{item.quantity}</span>
+                  <button onClick={() => changeQty(idx, 1)} className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center"><Plus className="w-3 h-3 text-zinc-300" /></button>
+                </div>
+              </div>
+            ))}
+
+            <div className="space-y-3 pt-1">
+              {/* Notes */}
+              <textarea value={notes} onChange={e => setNotes(e.target.value)}
+                placeholder="Order notes (optional)..." rows={2}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-orange-500 resize-none" />
+
+              {/* ── DISCOUNT SECTION ── */}
+              <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/50">
+                <div className="flex items-center gap-1.5 mb-2.5">
+                  <Tag className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Discount</span>
+                </div>
+                <div className="flex gap-1.5 mb-2">
+                  {DISCOUNT_PRESETS.map(d => (
+                    <button key={d} onClick={() => setDiscountPercent(d)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        discountPercent === d
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600 hover:text-zinc-200'
+                      }`}>
+                      {d === 0 ? 'None' : `${d}%`}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={discountPercent === 0 ? '' : discountPercent}
+                    onChange={e => {
+                      const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                      setDiscountPercent(val);
+                    }}
+                    placeholder="Custom %"
+                    min="0" max="100"
+                    className="w-full bg-zinc-700 border border-zinc-600 focus:border-orange-500 rounded-lg pl-3 pr-8 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm font-bold">%</span>
+                </div>
+                {discountPercent > 0 && (
+                  <div className="mt-2 flex justify-between text-xs">
+                    <span className="text-zinc-500">Saving</span>
+                    <span className="text-green-400 font-semibold">- ₹{discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ── BULK ORDER TOGGLE ── */}
+              <button
+                onClick={() => setShowBulkModal(!showBulkModal)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-sm font-semibold ${
+                  showBulkModal
+                    ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
+                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  <span>Bulk / Advance Order</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {showBulkModal && bulkPhone && (
+                    <span className="text-xs text-purple-400 font-medium truncate max-w-[90px]">{bulkPhone}</span>
+                  )}
+                  <div className={`w-8 h-4 rounded-full transition-colors relative ${showBulkModal ? 'bg-purple-500' : 'bg-zinc-700'}`}>
+                    <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${showBulkModal ? 'left-4' : 'left-0.5'}`} />
+                  </div>
+                </div>
+              </button>
             </div>
-            <div className="flex items-center gap-1">
-              <button onClick={() => changeQty(idx, -1)} className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center"><Minus className="w-3 h-3 text-zinc-300" /></button>
-              <span className="w-6 text-center text-sm font-bold text-white">{item.quantity}</span>
-              <button onClick={() => changeQty(idx, 1)} className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center"><Plus className="w-3 h-3 text-zinc-300" /></button>
-            </div>
-          </div>
-        ))}
+          </>
+        )}
       </div>
 
+      {/* ── STICKY BOTTOM — Total + Place Order ── */}
       {cart.length > 0 && (
-        <div className="p-4 border-t border-zinc-800 space-y-3">
-          {/* Notes */}
-          <textarea value={notes} onChange={e => setNotes(e.target.value)}
-            placeholder="Order notes (optional)..." rows={2}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-orange-500 resize-none" />
-
-          {/* ── DISCOUNT SECTION ── */}
-          <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/50">
-            <div className="flex items-center gap-1.5 mb-2.5">
-              <Tag className="w-3.5 h-3.5 text-orange-400" />
-              <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Discount</span>
-            </div>
-            {/* Preset buttons */}
-            <div className="flex gap-1.5 mb-2">
-              {DISCOUNT_PRESETS.map(d => (
-                <button key={d} onClick={() => setDiscountPercent(d)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    discountPercent === d
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-zinc-700 text-zinc-400 hover:bg-zinc-600 hover:text-zinc-200'
-                  }`}>
-                  {d === 0 ? 'None' : `${d}%`}
-                </button>
-              ))}
-            </div>
-            {/* Custom input */}
-            <div className="relative">
-              <input
-                type="number"
-                value={discountPercent === 0 ? '' : discountPercent}
-                onChange={e => {
-                  const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
-                  setDiscountPercent(val);
-                }}
-                placeholder="Custom %"
-                min="0" max="100"
-                className="w-full bg-zinc-700 border border-zinc-600 focus:border-orange-500 rounded-lg pl-3 pr-8 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none transition-colors"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm font-bold">%</span>
-            </div>
-            {discountPercent > 0 && (
-              <div className="mt-2 flex justify-between text-xs">
-                <span className="text-zinc-500">Saving</span>
-                <span className="text-green-400 font-semibold">- ₹{discountAmount.toFixed(2)}</span>
-              </div>
-            )}
-          </div>
-
-          {/* ── BULK ORDER TOGGLE ── */}
-          <button
-            onClick={() => setShowBulkModal(true)}
-            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-sm font-semibold ${
-              showBulkModal
-                ? 'bg-purple-500/15 border-purple-500/40 text-purple-300'
-                : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              <span>Bulk / Advance Order</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {showBulkModal && bulkPhone && (
-                <span className="text-xs text-purple-400 font-medium truncate max-w-[90px]">{bulkPhone}</span>
-              )}
-              <div className={`w-8 h-4 rounded-full transition-colors relative ${showBulkModal ? 'bg-purple-500' : 'bg-zinc-700'}`}>
-                <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${showBulkModal ? 'left-4' : 'left-0.5'}`} />
-              </div>
-            </div>
-          </button>
-
+        <div className="flex-shrink-0 border-t border-zinc-800 bg-zinc-900 p-4 space-y-3">
           {/* Totals */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             {discountPercent > 0 && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-zinc-500">Subtotal</span>
@@ -402,7 +415,7 @@ function CartPanel({ cart, notes, setNotes, discountPercent, setDiscountPercent,
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -411,9 +424,7 @@ export default function StaffPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(['All']);
   const [activeCategory, setActiveCategory] = useState('All');
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [cart, setCart] = useState([]);
+const [cart, setCart] = useState([]);
   const [notes, setNotes] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
 
@@ -442,11 +453,6 @@ export default function StaffPage() {
   const [markingPaid, setMarkingPaid] = useState(null);
   const [showFloating, setShowFloating] = useState(true);
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
-
   const fetchLiveOrders = useCallback(() => {
     axios.get('/api/orders').then(res => setLiveOrders(res.data)).catch(() => {});
   }, []);
@@ -474,7 +480,7 @@ export default function StaffPage() {
       const cats = ['All', ...new Set(res.data.map(p => p.category))];
       const allowed = cats.filter(c => c === 'All' || c.toLowerCase().startsWith('counter'));
       setCategories(allowed.length > 1 ? allowed : cats);
-    }).catch(() => toast.error('Failed to load products'))
+    }).catch(err => { if (err.response?.status !== 401) toast.error('Failed to load products'); })
       .finally(() => setLoading(false));
     const interval = setInterval(fetchLiveOrders, 3000);
     return () => clearInterval(interval);
@@ -515,11 +521,9 @@ export default function StaffPage() {
   const packingCount = liveOrders.filter(o => o.status === 'pending' || o.status === 'in-progress').length;
   const readyCount   = liveOrders.filter(o => o.status === 'completed').length;
 
-  const filtered = products.filter(p => {
-    const inCat = activeCategory === 'All' || p.category === activeCategory;
-    const inSearch = p.name.toLowerCase().includes(debouncedSearch.toLowerCase());
-    return inCat && inSearch;
-  }).sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0));
+  const filtered = products.filter(p =>
+    activeCategory === 'All' || p.category === activeCategory
+  ).sort((a, b) => (b.orderCount || 0) - (a.orderCount || 0));
 
   const openModal = (product) => {
     setModalProduct(product);
@@ -566,7 +570,11 @@ export default function StaffPage() {
     discountAmount, totalAfterDiscount,
     onClear: () => setCart([]),
     showBulkModal,
-    setShowBulkModal: (val) => { setShowBulkModal(val); if (val) setBulkModalOpen(true); },
+    setShowBulkModal: (val) => {
+      setShowBulkModal(val);
+      if (val) setBulkModalOpen(true);
+      else { setBulkName(''); setBulkPhone(''); setBulkAdvance(''); setBulkSchedule(''); }
+    },
     bulkPhone,
   };
 
@@ -777,18 +785,12 @@ export default function StaffPage() {
       )}
 
       {/* ── MAIN LAYOUT ── */}
-      <main className="flex-1 flex overflow-hidden max-w-7xl mx-auto w-full px-3 sm:px-4 gap-4 py-4">
+      <main className="flex-1 flex max-w-7xl mx-auto w-full px-3 sm:px-4 gap-4 py-4 items-start">
 
         {/* LEFT — Products */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Search + Category */}
+          {/* Category */}
           <div className="mb-3">
-            <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Search products..."
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-orange-500" />
-            </div>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {categories.map(cat => (
                 <button key={cat} onClick={() => setActiveCategory(cat)}
@@ -849,7 +851,7 @@ export default function StaffPage() {
         </div>
 
         {/* RIGHT — Cart (desktop) */}
-        <div className="hidden sm:flex w-72 lg:w-80 flex-shrink-0 flex-col card overflow-hidden">
+        <div className="hidden sm:flex w-72 lg:w-80 flex-shrink-0 flex-col card overflow-hidden sticky top-28 self-start" style={{ maxHeight: 'calc(100vh - 7.5rem)' }}>
           <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
             <h3 className="font-bold text-white text-lg" style={{ fontFamily: 'Sora, sans-serif' }}>Cart</h3>
             <span className="bg-orange-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">{cartCount} items</span>

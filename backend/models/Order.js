@@ -27,6 +27,7 @@ const orderSchema = new mongoose.Schema(
     discountAmount: { type: Number, default: 0 },
     payableAmount: { type: Number, default: 0 },
     bulk: {
+      customerName: { type: String, default: '' },
       phone: { type: String, default: '' },
       advance: { type: Number, default: 0 },
       schedule: { type: Date },

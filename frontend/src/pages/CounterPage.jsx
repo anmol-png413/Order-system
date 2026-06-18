@@ -33,7 +33,7 @@ export default function CounterPage() {
   const fetchOrders = useCallback((showError = false) => {
     axios.get('/api/orders').then(res =>
       setOrders(res.data.filter(o => o.status === 'completed'))
-    ).catch(() => { if (showError) toast.error('Failed to load orders'); })
+    ).catch(err => { if (showError && err.response?.status !== 401) toast.error('Failed to load orders'); })
       .finally(() => setLoading(false));
   }, []);
 

@@ -75,6 +75,7 @@ router.post('/', async (req, res) => {
     const payableAmount = +(totalAmount - discountAmount).toFixed(2);
 
     const bulkInfo = bulk ? {
+      customerName: bulk.customerName || '',
       phone: bulk.phone || '',
       advance: Number(bulk.advance) || 0,
       schedule: bulk.schedule ? new Date(bulk.schedule) : undefined,

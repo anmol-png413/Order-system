@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import { useSocket } from '../hooks/useSocket';
 import { Plus, Edit2, Trash2, X, BarChart3, Package, Users, ShoppingBag, Upload, Eye, EyeOff, AlertTriangle, ClipboardList, Clock, Phone, Calendar, Wallet, TrendingUp, Award, Layers } from 'lucide-react';
+import { getThumbUrl } from '../utils/imageUtils';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
@@ -61,7 +62,7 @@ export default function AdminPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try { const res = await axios.get('/api/orders'); setOrders(res.data); }
-    catch { toast.error('Failed to load orders'); }
+    catch (err) { if (err.response?.status !== 401) toast.error('Failed to load orders'); }
     finally { setLoading(false); }
   };
 
@@ -95,7 +96,7 @@ export default function AdminPage() {
     try {
       const res = await axios.get('/api/orders/stats');
       setStats(res.data);
-    } catch { toast.error('Failed to load stats'); }
+    } catch (err) { if (err.response?.status !== 401) toast.error('Failed to load stats'); }
   };
 
   const fetchReports = async () => {
@@ -108,14 +109,14 @@ export default function AdminPage() {
   const fetchProducts = async () => {
     setLoading(true);
     try { const res = await axios.get('/api/products'); setProducts(res.data); }
-    catch { toast.error('Failed to load products'); }
+    catch (err) { if (err.response?.status !== 401) toast.error('Failed to load products'); }
     finally { setLoading(false); }
   };
 
   const fetchUsers = async () => {
     setLoading(true);
     try { const res = await axios.get('/api/auth/users'); setUsers(res.data); }
-    catch { toast.error('Failed to load users'); }
+    catch (err) { if (err.response?.status !== 401) toast.error('Failed to load users'); }
     finally { setLoading(false); }
   };
 

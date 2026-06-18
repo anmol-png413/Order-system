@@ -18,13 +18,16 @@ export default defineConfig({
     },
   },
   build: {
+    target: 'es2018',
+    minify: 'esbuild',
+    cssMinify: true,
     rollupOptions: {
       output: {
         manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-ui':    ['lucide-react', 'react-hot-toast'],
+          'vendor-react':  ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui':     ['lucide-react', 'react-hot-toast'],
           'vendor-socket': ['socket.io-client'],
-          'vendor-http':  ['axios'],
+          'vendor-http':   ['axios'],
         },
       },
     },

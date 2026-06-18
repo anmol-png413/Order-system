@@ -23,7 +23,7 @@ function fmtQty(quantity, quantityLabel, unit) {
 }
 
 // ── Bulk Order Modal ─────────────────────────────────────────────
-function BulkOrderModal({ onClose, bulkPhone, setBulkPhone, bulkAdvance, setBulkAdvance, bulkSchedule, setBulkSchedule, cartTotal, discountPercent }) {
+function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhone, bulkAdvance, setBulkAdvance, bulkSchedule, setBulkSchedule, cartTotal, discountPercent }) {
   const discount = +(cartTotal * (discountPercent / 100)).toFixed(2);
   const payable = +(cartTotal - discount).toFixed(2);
   const advance = parseFloat(bulkAdvance) || 0;
@@ -49,6 +49,20 @@ function BulkOrderModal({ onClose, bulkPhone, setBulkPhone, bulkAdvance, setBulk
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Name */}
+          <div>
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2">
+              <Users className="w-3 h-3" /> Customer Name
+            </label>
+            <input
+              type="text"
+              value={bulkName}
+              onChange={e => setBulkName(e.target.value)}
+              placeholder="e.g. Anmol Sharma"
+              className="w-full bg-zinc-800 border border-zinc-700 focus:border-purple-500 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-sm focus:outline-none transition-colors"
+            />
+          </div>
+
           {/* Phone */}
           <div>
             <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-2">
@@ -406,6 +420,7 @@ export default function StaffPage() {
   // Bulk order
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkName, setBulkName] = useState('');
   const [bulkPhone, setBulkPhone] = useState('');
   const [bulkAdvance, setBulkAdvance] = useState('');
   const [bulkSchedule, setBulkSchedule] = useState('');
@@ -564,6 +579,7 @@ export default function StaffPage() {
       const payload = { items: cart, notes, discountPercent };
       if (showBulkModal) {
         payload.bulk = {
+          customerName: bulkName.trim(),
           phone: bulkPhone,
           advance: parseFloat(bulkAdvance) || 0,
           schedule: bulkSchedule || null,
@@ -579,6 +595,7 @@ export default function StaffPage() {
       setNotes('');
       setDiscountPercent(0);
       setShowBulkModal(false);
+      setBulkName('');
       setBulkPhone('');
       setBulkAdvance('');
       setBulkSchedule('');
@@ -662,6 +679,7 @@ export default function StaffPage() {
       {bulkModalOpen && (
         <BulkOrderModal
           onClose={() => setBulkModalOpen(false)}
+          bulkName={bulkName} setBulkName={setBulkName}
           bulkPhone={bulkPhone} setBulkPhone={setBulkPhone}
           bulkAdvance={bulkAdvance} setBulkAdvance={setBulkAdvance}
           bulkSchedule={bulkSchedule} setBulkSchedule={setBulkSchedule}

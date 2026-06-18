@@ -713,22 +713,36 @@ export default function StaffPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-zinc-400 text-sm font-medium">Quantity</span>
-                  <div className="flex items-center gap-3 bg-zinc-800 rounded-xl p-1">
-                    <button onClick={() => setModalQty(q => Math.max(1, q - 1))} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300"><Minus className="w-4 h-4" /></button>
-                    <span className="text-white font-bold text-xl w-10 text-center" style={{ fontFamily: 'Sora, sans-serif' }}>{modalQty}</span>
-                    <button onClick={() => setModalQty(q => q + 1)} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300"><Plus className="w-4 h-4" /></button>
+                <div className="mb-2">
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wide">
+                    Select Pieces <span className="normal-case text-zinc-600">(or type below)</span>
+                  </label>
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    {[5, 20, 50, 100].map(p => (
+                      <button key={p} type="button" onClick={() => setModalQty(p)}
+                        className={`py-3 rounded-xl text-base font-bold transition-all ${modalQty === p ? 'bg-orange-500 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'}`}
+                        style={{ fontFamily: 'Sora, sans-serif' }}>
+                        {p}
+                      </button>
+                    ))}
                   </div>
                   <input
                     type="number"
                     value={modalQty === 0 ? '' : modalQty}
                     onChange={e => setModalQty(e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                     onBlur={() => { if (!modalQty || modalQty < 1) setModalQty(1); }}
-                    placeholder="Type quantity e.g. 500"
+                    placeholder="Or type: e.g. 500"
                     min="1"
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-lg focus:outline-none focus:border-orange-500"
                   />
+                  <div className="flex items-center justify-between mt-3">
+                    <span className="text-zinc-400 text-sm font-medium">Pieces</span>
+                    <div className="flex items-center gap-3 bg-zinc-800 rounded-xl p-1">
+                      <button onClick={() => setModalQty(q => Math.max(1, q - 1))} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300"><Minus className="w-4 h-4" /></button>
+                      <span className="text-white font-bold text-xl w-10 text-center" style={{ fontFamily: 'Sora, sans-serif' }}>{modalQty}</span>
+                      <button onClick={() => setModalQty(q => q + 1)} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300"><Plus className="w-4 h-4" /></button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

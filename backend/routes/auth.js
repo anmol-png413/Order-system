@@ -6,7 +6,7 @@ const User = require('../models/User');
 const { protect, restrictTo } = require('../middleware/auth');
 
 const signToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '1y' });
 
 // Max 10 login attempts per IP per 15 minutes
 const loginLimiter = rateLimit({
@@ -22,7 +22,7 @@ const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
 };
 
 // POST /api/auth/login
@@ -86,7 +86,7 @@ router.post('/users', protect, restrictTo('admin'), async (req, res) => {
 // GET /api/auth/users — Admin only: list all users
 router.get('/users', protect, restrictTo('admin'), async (req, res) => {
   try {
-    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    const users = await User.find({ isActive: { $ne: false } }).select('-password').sort({ createdAt: -1 });
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });

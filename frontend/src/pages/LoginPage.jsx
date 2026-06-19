@@ -37,10 +37,10 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center w-24 h-24 rounded-full mb-5 shadow-2xl overflow-hidden bg-white">
-            <img src="/image.png" alt="Green Sweets" className="w-full h-full object-contain" />
+            <img src="/image.png" alt="Green Sweets 2" className="w-full h-full object-contain" />
           </div>
           <h1 className="text-3xl font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>
-            Green Sweets
+            Green Sweets 2
           </h1>
           <p className="text-zinc-500 mt-1 text-sm">Smart Order Management System</p>
         </div>

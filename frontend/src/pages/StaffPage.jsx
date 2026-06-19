@@ -10,8 +10,7 @@ import {
 } from 'lucide-react';
 import {
   IMG_FALLBACK, parseWeightToKg,
-  buildSlipHTML, buildCustomerSlipHTML, buildInternalReceiptHTML,
-  writeAndPrint, printSlip,
+  printOrderSlips, printSlip,
 } from '../utils/printUtils';
 function fmtQty(quantity, quantityLabel, unit) {
   if (unit === 'piece') return `${quantity} pcs`;
@@ -28,6 +27,19 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
   const payable = +(cartTotal - discount).toFixed(2);
   const advance = parseFloat(bulkAdvance) || 0;
   const balance = +(payable - advance).toFixed(2);
+
+  const [errors, setErrors] = useState({});
+
+  const handleSave = () => {
+    const e = {};
+    if (!bulkName.trim())                     e.name     = 'Customer name is required';
+    if (!bulkPhone.trim())                    e.phone    = 'Phone number is required';
+    if (!bulkAdvance || parseFloat(bulkAdvance) <= 0) e.advance  = 'Enter advance amount (greater than 0)';
+    if (!bulkSchedule)                        e.schedule = 'Please select a date';
+    if (Object.keys(e).length > 0) { setErrors(e); return; }
+    setErrors({});
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 py-4" onClick={onClose}>
@@ -57,10 +69,11 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
             <input
               type="text"
               value={bulkName}
-              onChange={e => setBulkName(e.target.value)}
+              onChange={e => { setBulkName(e.target.value); setErrors(prev => ({ ...prev, name: '' })); }}
               placeholder="e.g. Anmol Sharma"
-              className="w-full bg-zinc-800 border border-zinc-700 focus:border-purple-500 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-sm focus:outline-none transition-colors"
+              className={`w-full bg-zinc-800 border rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-sm focus:outline-none transition-colors ${errors.name ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}
             />
+            {errors.name && <p className="text-red-400 text-xs mt-1">{errors.name}</p>}
           </div>
 
           {/* Phone */}
@@ -71,10 +84,11 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
             <input
               type="tel"
               value={bulkPhone}
-              onChange={e => setBulkPhone(e.target.value)}
+              onChange={e => { setBulkPhone(e.target.value); setErrors(prev => ({ ...prev, phone: '' })); }}
               placeholder="+91 98765 43210"
-              className="w-full bg-zinc-800 border border-zinc-700 focus:border-purple-500 rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-sm focus:outline-none transition-colors"
+              className={`w-full bg-zinc-800 border rounded-xl px-4 py-3 text-zinc-100 placeholder-zinc-600 text-sm focus:outline-none transition-colors ${errors.phone ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}
             />
+            {errors.phone && <p className="text-red-400 text-xs mt-1">{errors.phone}</p>}
           </div>
 
           {/* Advance */}
@@ -87,12 +101,13 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
               <input
                 type="number"
                 value={bulkAdvance}
-                onChange={e => setBulkAdvance(e.target.value)}
+                onChange={e => { setBulkAdvance(e.target.value); setErrors(prev => ({ ...prev, advance: '' })); }}
                 placeholder="0"
                 min="0"
-                className="w-full bg-zinc-800 border border-zinc-700 focus:border-purple-500 rounded-xl pl-8 pr-4 py-3 text-zinc-100 placeholder-zinc-600 text-sm focus:outline-none transition-colors"
+                className={`w-full bg-zinc-800 border rounded-xl pl-8 pr-4 py-3 text-zinc-100 placeholder-zinc-600 text-sm focus:outline-none transition-colors ${errors.advance ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}
               />
             </div>
+            {errors.advance && <p className="text-red-400 text-xs mt-1">{errors.advance}</p>}
           </div>
 
           {/* Schedule */}
@@ -103,10 +118,11 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
             <input
               type="date"
               value={bulkSchedule}
-              onChange={e => setBulkSchedule(e.target.value)}
+              onChange={e => { setBulkSchedule(e.target.value); setErrors(prev => ({ ...prev, schedule: '' })); }}
               min={new Date().toISOString().split('T')[0]}
-              className="w-full bg-zinc-800 border border-zinc-700 focus:border-purple-500 rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none transition-colors [color-scheme:dark]"
+              className={`w-full bg-zinc-800 border rounded-xl px-4 py-3 text-zinc-100 text-sm focus:outline-none transition-colors [color-scheme:dark] ${errors.schedule ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-purple-500'}`}
             />
+            {errors.schedule && <p className="text-red-400 text-xs mt-1">{errors.schedule}</p>}
           </div>
 
           {/* Summary card */}
@@ -132,7 +148,7 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
 
         <div className="px-5 pb-5 flex-shrink-0 border-t border-zinc-800 pt-4">
           <button
-            onClick={onClose}
+            onClick={handleSave}
             className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition-colors"
             style={{ fontFamily: 'Sora, sans-serif' }}
           >
@@ -581,8 +597,6 @@ const [cart, setCart] = useState([]);
   async function placeOrder() {
     if (cart.length === 0) return;
     setPlacing(true);
-    const printWin    = window.open('', '_blank', 'width=320,height=640');
-    const internalWin = window.open('', '_blank', 'width=420,height=640');
     try {
       const payload = { items: cart, notes, discountPercent };
       if (showBulkModal) {
@@ -597,8 +611,7 @@ const [cart, setCart] = useState([]);
       const orderData = { token: res.data.tokenNumber, items: [...cart], notes };
       setSuccessData(orderData);
       setTimeout(() => setSuccessData(null), 2000);
-      if (printWin && !printWin.closed)    writeAndPrint(printWin,    buildCustomerSlipHTML(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk));
-      if (internalWin && !internalWin.closed) writeAndPrint(internalWin, buildInternalReceiptHTML(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk));
+      printOrderSlips(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk);
       setCart([]);
       setNotes('');
       setDiscountPercent(0);
@@ -609,8 +622,6 @@ const [cart, setCart] = useState([]);
       setBulkSchedule('');
       setCartOpen(false);
     } catch (err) {
-      if (printWin && !printWin.closed) printWin.close();
-      try { if (internalWin && !internalWin.closed) internalWin.close(); } catch {}
       toast.error(err.response?.data?.message || 'Failed to place order');
     } finally {
       setPlacing(false);
@@ -733,7 +744,22 @@ const [cart, setCart] = useState([]);
                     <span className="text-zinc-400 text-sm font-medium">Quantity</span>
                     <div className="flex items-center gap-3 bg-zinc-800 rounded-xl p-1">
                       <button onClick={() => setModalQty(q => Math.max(1, q - 1))} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300"><Minus className="w-4 h-4" /></button>
-                      <span className="text-white font-bold text-xl w-10 text-center" style={{ fontFamily: 'Sora, sans-serif' }}>{modalQty}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={modalQty}
+                        onChange={e => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val) && val >= 1) setModalQty(val);
+                          else if (e.target.value === '') setModalQty('');
+                        }}
+                        onBlur={e => {
+                          const val = parseInt(e.target.value);
+                          setModalQty(!isNaN(val) && val >= 1 ? val : 1);
+                        }}
+                        className="text-white font-bold text-xl w-12 text-center bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        style={{ fontFamily: 'Sora, sans-serif' }}
+                      />
                       <button onClick={() => setModalQty(q => q + 1)} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300"><Plus className="w-4 h-4" /></button>
                     </div>
                   </div>
@@ -765,7 +791,22 @@ const [cart, setCart] = useState([]);
                     <span className="text-zinc-400 text-sm font-medium">Pieces</span>
                     <div className="flex items-center gap-3 bg-zinc-800 rounded-xl p-1">
                       <button onClick={() => setModalQty(q => Math.max(1, q - 1))} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300"><Minus className="w-4 h-4" /></button>
-                      <span className="text-white font-bold text-xl w-10 text-center" style={{ fontFamily: 'Sora, sans-serif' }}>{modalQty}</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={modalQty}
+                        onChange={e => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val) && val >= 1) setModalQty(val);
+                          else if (e.target.value === '') setModalQty('');
+                        }}
+                        onBlur={e => {
+                          const val = parseInt(e.target.value);
+                          setModalQty(!isNaN(val) && val >= 1 ? val : 1);
+                        }}
+                        className="text-white font-bold text-xl w-12 text-center bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        style={{ fontFamily: 'Sora, sans-serif' }}
+                      />
                       <button onClick={() => setModalQty(q => q + 1)} className="w-10 h-10 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300"><Plus className="w-4 h-4" /></button>
                     </div>
                   </div>

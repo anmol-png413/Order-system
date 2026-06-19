@@ -173,6 +173,18 @@ export default function AdminPage() {
     finally { setDeleteConfirm(null); }
   };
 
+  const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState(null);
+
+  const permanentDeleteProduct = async () => {
+    if (!permanentDeleteConfirm) return;
+    try {
+      await axios.delete(`/api/products/${permanentDeleteConfirm.id}/permanent`);
+      setProducts(prev => prev.filter(p => p._id !== permanentDeleteConfirm.id));
+      toast.success(`"${permanentDeleteConfirm.name}" permanently deleted`);
+    } catch { toast.error('Failed to delete product'); }
+    finally { setPermanentDeleteConfirm(null); }
+  };
+
   const restoreProduct = async (id) => {
     try {
       const res = await axios.patch(`/api/products/${id}/restore`);
@@ -516,8 +528,12 @@ export default function AdminPage() {
                               <Edit2 className="w-3.5 h-3.5" /> Edit
                             </button>
                             <button onClick={() => confirmDelete(p._id, p.name)}
-                              className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1 min-h-[40px]">
+                              className="flex-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 text-xs font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1 min-h-[40px]">
                               <Trash2 className="w-3.5 h-3.5" /> Archive
+                            </button>
+                            <button onClick={() => setPermanentDeleteConfirm({ id: p._id, name: p.name })}
+                              className="flex-1 bg-red-600/15 hover:bg-red-600/30 text-red-500 text-xs font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1 min-h-[40px]">
+                              <Trash2 className="w-3.5 h-3.5" /> Delete
                             </button>
                           </div>
                         </div>
@@ -552,12 +568,20 @@ export default function AdminPage() {
                               <h3 className="font-semibold text-zinc-400 text-sm leading-tight mb-0.5" style={{ fontFamily: 'Sora, sans-serif' }}>{p.name}</h3>
                               <p className="text-xs text-zinc-700 mb-1">{p.category}</p>
                               <p className="text-zinc-600 font-bold text-sm">₹{p.price.toFixed(2)}</p>
-                              <button
-                                onClick={() => restoreProduct(p._id)}
-                                className="w-full mt-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium py-2.5 rounded-xl transition-colors min-h-[40px]"
-                              >
-                                Restore
-                              </button>
+                              <div className="flex gap-2 mt-3">
+                                <button
+                                  onClick={() => restoreProduct(p._id)}
+                                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium py-2.5 rounded-xl transition-colors min-h-[40px]"
+                                >
+                                  Restore
+                                </button>
+                                <button
+                                  onClick={() => setPermanentDeleteConfirm({ id: p._id, name: p.name })}
+                                  className="flex-1 bg-red-600/15 hover:bg-red-600/30 text-red-500 text-xs font-medium py-2.5 rounded-xl transition-colors min-h-[40px]"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -793,6 +817,34 @@ export default function AdminPage() {
                 className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 rounded-xl transition-colors min-h-[44px]"
                 style={{ fontFamily: 'Sora, sans-serif' }}>
                 Archive
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PERMANENT DELETE CONFIRM MODAL ── */}
+      {permanentDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-red-500/30 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-pop">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-500/15 rounded-xl flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>Delete Product?</h3>
+                <p className="text-red-400 text-sm">This action cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-zinc-300 text-sm mb-6 bg-zinc-800 rounded-xl px-4 py-3">
+              <span className="font-semibold text-white">"{permanentDeleteConfirm.name}"</span> will be permanently deleted from the database.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setPermanentDeleteConfirm(null)} className="flex-1 btn-ghost min-h-[44px]">Cancel</button>
+              <button onClick={permanentDeleteProduct}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl transition-colors min-h-[44px]"
+                style={{ fontFamily: 'Sora, sans-serif' }}>
+                Delete Forever
               </button>
             </div>
           </div>

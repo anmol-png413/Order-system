@@ -137,8 +137,8 @@ function shopHeader(now) {
   const time = now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true });
   return `
     <div class="sep-double">★ ─────────────── ★</div>
-    <div class="shop-name">Green Sweets</div>
-    <div class="shop-tag">— SINCE 1985 —</div>
+    <div class="shop-name">Green Sweets 2</div>
+    <div class="shop-tag">— SINCE 1967 —</div>
     <div class="shop-info">+91 98880 77154</div>
     <div class="sep-double">★ ─────────────── ★</div>
     <div class="center small" style="color:#555;margin-bottom:2px">${date} &nbsp;|&nbsp; ${time}</div>
@@ -178,7 +178,7 @@ export function buildSlipHTML(tokenNumber, items, notes) {
   const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>Green Sweets - Packing Slip</title>
+  <title>Green Sweets 2 - Packing Slip</title>
   <style>${BASE_STYLE}</style></head><body>
 
   ${shopHeader(now)}
@@ -230,7 +230,7 @@ export function buildCustomerSlipHTML(tokenNumber, items, notes, discountPercent
   const balance  = +(payable - advance).toFixed(2);
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>Green Sweets - Bill</title>
+  <title>Green Sweets 2 - Bill</title>
   <style>${BASE_STYLE}</style></head><body>
 
   ${shopHeader(now)}
@@ -275,9 +275,9 @@ export function buildCustomerSlipHTML(tokenNumber, items, notes, discountPercent
 
   ${bulkInfo && advance > 0 ? `
   <hr class="sep-dash">
-  <div class="totals-row small">
+  <div class="totals-row discount-row small">
     <span>Advance Paid</span>
-    <span>₹${advance.toFixed(2)}</span>
+    <span>- ₹${advance.toFixed(2)}</span>
   </div>
   <div class="totals-row small bold ${balance > 0 ? '' : ''}">
     <span>${balance > 0 ? 'Balance Due' : 'Fully Paid ✓'}</span>
@@ -293,8 +293,7 @@ export function buildCustomerSlipHTML(tokenNumber, items, notes, discountPercent
   <hr class="sep-dash">
   <div class="footer-msg">Thank You!</div>
   <div class="footer-sub">
-    Goods once sold will not be taken back<br>
-    +91 98880 77154
+    Goods once sold will not be taken back
   </div>
   <div class="sep-double" style="margin-top:6px">★ ─────────────── ★</div>
 
@@ -316,11 +315,11 @@ export function buildInternalReceiptHTML(tokenNumber, items, notes, discountPerc
   const time = now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true });
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>Green Sweets - Receipt</title>
+  <title>Green Sweets 2 - Receipt</title>
   <style>${BASE_STYLE}</style></head><body>
 
   <div class="sep-double">★ ─────────────── ★</div>
-  <div class="shop-name">Green Sweets</div>
+  <div class="shop-name">Green Sweets 2</div>
   <div class="shop-tag">— STAFF COPY —</div>
   <div class="sep-double">★ ─────────────── ★</div>
 
@@ -393,9 +392,44 @@ export function writeAndPrint(win, html) {
   }, 300);
 }
 
+// Mobile-compatible print using hidden iframe (no popup blocker issues)
+function printHTML(html) {
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none;';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  const cleanup = () => {
+    if (document.body.contains(iframe)) document.body.removeChild(iframe);
+  };
+
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+    iframe.contentWindow.onafterprint = cleanup;
+    setTimeout(cleanup, 8000);
+  }, 400);
+}
+
+// Combines customer bill + internal receipt into one print job (mobile + desktop)
+export function printOrderSlips(tokenNumber, items, notes, discountPercent, bulkInfo) {
+  const extractBody = (html) =>
+    html.replace(/^[\s\S]*?<body[^>]*>/i, '').replace(/<\/body>[\s\S]*$/i, '');
+
+  const combined = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <style>${BASE_STYLE}.slip-break{page-break-after:always;break-after:page;}</style>
+  </head><body>
+    <div class="slip-break">${extractBody(buildCustomerSlipHTML(tokenNumber, items, notes, discountPercent, bulkInfo))}</div>
+    ${extractBody(buildInternalReceiptHTML(tokenNumber, items, notes, discountPercent, bulkInfo))}
+  </body></html>`;
+
+  printHTML(combined);
+}
+
 export function printSlip(tokenNumber, items, notes) {
-  const html = buildSlipHTML(tokenNumber, items, notes);
-  const win = window.open('', '_blank', 'width=320,height=640');
-  if (!win) return;
-  writeAndPrint(win, html);
+  printHTML(buildSlipHTML(tokenNumber, items, notes));
 }

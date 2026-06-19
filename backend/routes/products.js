@@ -125,6 +125,17 @@ router.delete('/:id', protect, restrictTo('admin'), async (req, res) => {
   }
 });
 
+// DELETE /api/products/:id/permanent — Admin only (permanent, cannot be undone)
+router.delete('/:id/permanent', protect, restrictTo('admin'), async (req, res) => {
+  try {
+    const product = await Product.findByIdAndDelete(req.params.id);
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json({ message: 'Product permanently deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // PATCH /api/products/:id/restore — Admin only
 router.patch('/:id/restore', protect, restrictTo('admin'), async (req, res) => {
   try {

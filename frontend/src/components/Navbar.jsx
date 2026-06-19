@@ -25,11 +25,11 @@ export default function Navbar({ title, subtitle }) {
       <nav className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4" aria-label="Main navigation">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-white" aria-hidden="true">
-            <img src="/image.png" alt="Green Sweets" className="w-full h-full object-contain" />
+            <img src="/image.png" alt="Green Sweets 2" className="w-full h-full object-contain" />
           </div>
           <div>
             <h1 className="font-bold text-white leading-none text-lg" style={{ fontFamily: 'Sora, sans-serif' }}>
-              Green Sweets
+              Green Sweets 2
             </h1>
             {subtitle && <p className="text-xs text-zinc-500 mt-0.5">{subtitle}</p>}
           </div>

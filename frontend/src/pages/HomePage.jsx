@@ -43,9 +43,9 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full overflow-hidden bg-white flex-shrink-0">
-              <img src="/image.png" alt="Green Sweets" className="w-full h-full object-contain" />
+              <img src="/image.png" alt="Green Sweets 2" className="w-full h-full object-contain" />
             </div>
-            <span className="font-bold text-white text-lg" style={{ fontFamily: 'Sora, sans-serif' }}>Green Sweets</span>
+            <span className="font-bold text-white text-lg" style={{ fontFamily: 'Sora, sans-serif' }}>Green Sweets 2</span>
           </div>
           <button
             onClick={() => navigate('/login')}
@@ -177,9 +177,22 @@ export default function HomePage() {
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="text-white font-bold text-lg w-8 text-center" style={{ fontFamily: 'Sora, sans-serif' }}>
-                    {qty}
-                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={qty}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 1) setQty(val);
+                      else if (e.target.value === '') setQty('');
+                    }}
+                    onBlur={e => {
+                      const val = parseInt(e.target.value);
+                      setQty(!isNaN(val) && val >= 1 ? val : 1);
+                    }}
+                    className="text-white font-bold text-lg w-10 text-center bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    style={{ fontFamily: 'Sora, sans-serif' }}
+                  />
                   <button
                     onClick={() => setQty(q => q + 1)}
                     className="w-8 h-8 rounded-lg hover:bg-zinc-700 flex items-center justify-center text-zinc-300 transition-colors"

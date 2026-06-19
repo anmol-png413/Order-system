@@ -1,14 +1,16 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
-import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
-import CartPage from './pages/CartPage';
-import StaffPage from './pages/StaffPage';
-import PackingPage from './pages/PackingPage';
-import CounterPage from './pages/CounterPage';
-import AdminPage from './pages/AdminPage';
+import LoginPage from './pages/LoginPage';
+
+const CartPage = lazy(() => import('./pages/CartPage'));
+const StaffPage = lazy(() => import('./pages/StaffPage'));
+const PackingPage = lazy(() => import('./pages/PackingPage'));
+const CounterPage = lazy(() => import('./pages/CounterPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
 
 const Spinner = () => (
   <div className="h-screen flex items-center justify-center bg-zinc-950">
@@ -54,16 +56,18 @@ export default function App() {
               ariaProps: { role: 'status', 'aria-live': 'polite' },
             }}
           />
-          <Routes>
-            <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
-            <Route path="/cart" element={<PrivateRoute><CartPage /></PrivateRoute>} />
-            <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-            <Route path="/staff" element={<RoleRoute allowed={['staff', 'admin']}><StaffPage /></RoleRoute>} />
-            <Route path="/packing" element={<RoleRoute allowed={['packing', 'admin']}><PackingPage /></RoleRoute>} />
-            <Route path="/counter" element={<RoleRoute allowed={['counter', 'admin']}><CounterPage /></RoleRoute>} />
-            <Route path="/admin" element={<RoleRoute allowed={['admin']}><AdminPage /></RoleRoute>} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Suspense fallback={<Spinner />}>
+            <Routes>
+              <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
+              <Route path="/cart" element={<PrivateRoute><CartPage /></PrivateRoute>} />
+              <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+              <Route path="/staff" element={<RoleRoute allowed={['staff', 'admin']}><StaffPage /></RoleRoute>} />
+              <Route path="/packing" element={<RoleRoute allowed={['packing', 'admin']}><PackingPage /></RoleRoute>} />
+              <Route path="/counter" element={<RoleRoute allowed={['counter', 'admin']}><CounterPage /></RoleRoute>} />
+              <Route path="/admin" element={<RoleRoute allowed={['admin']}><AdminPage /></RoleRoute>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </CartProvider>
     </AuthProvider>

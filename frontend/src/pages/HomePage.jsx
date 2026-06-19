@@ -4,6 +4,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { ShoppingCart, ShoppingBag, Plus, Minus, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { getThumbUrl, getFullUrl } from '../utils/imageUtils';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" fill="%231a1a1a"/><text x="60" y="68" text-anchor="middle" font-size="40" fill="%23444">🍽️</text></svg>';
 
@@ -23,6 +24,10 @@ export default function HomePage() {
   }, []);
 
   const categories = [...new Set(products.map(p => p.category))];
+
+  const lcpProductId = categories.length > 0
+    ? products.find(p => p.category === categories[0])?._id
+    : null;
 
   const openModal = (product) => { setSelected(product); setQty(1); };
   const closeModal = () => setSelected(null);
@@ -99,9 +104,11 @@ export default function HomePage() {
                     >
                       <div className="aspect-square bg-zinc-800 overflow-hidden">
                         <img
-                          src={product.image || IMG_FALLBACK}
+                          src={getThumbUrl(product.image) || IMG_FALLBACK}
                           alt={product.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading={product._id === lcpProductId ? 'eager' : 'lazy'}
+                          fetchPriority={product._id === lcpProductId ? 'high' : 'low'}
                           onError={e => { e.target.src = IMG_FALLBACK; }}
                         />
                       </div>
@@ -136,7 +143,7 @@ export default function HomePage() {
             {/* Large image */}
             <div className="aspect-video bg-zinc-800 relative overflow-hidden">
               <img
-                src={selected.image || IMG_FALLBACK}
+                src={getFullUrl(selected.image) || IMG_FALLBACK}
                 alt={selected.name}
                 className="w-full h-full object-cover"
                 onError={e => { e.target.src = IMG_FALLBACK; }}

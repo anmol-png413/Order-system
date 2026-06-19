@@ -139,10 +139,7 @@ function shopHeader(now) {
     <div class="sep-double">★ ─────────────── ★</div>
     <div class="shop-name">Green Sweets</div>
     <div class="shop-tag">— SINCE 1985 —</div>
-    <div class="shop-info">
-      Sector 17, Market Road, Chandigarh<br>
-      📞 +91 98880 77154
-    </div>
+    <div class="shop-info">+91 98880 77154</div>
     <div class="sep-double">★ ─────────────── ★</div>
     <div class="center small" style="color:#555;margin-bottom:2px">${date} &nbsp;|&nbsp; ${time}</div>
   `;
@@ -208,11 +205,10 @@ export function buildSlipHTML(tokenNumber, items, notes) {
     </tr>
   </table>
 
-  ${notes ? `<hr class="sep-dash"><div class="small" style="color:#555">📝 Note: ${notes}</div>` : ''}
+  ${notes ? `<hr class="sep-dash"><div class="small" style="color:#555">Note: ${notes}</div>` : ''}
 
   <hr class="sep-solid">
-  <div class="stars">✦ ✦ ✦</div>
-  <div class="footer-msg">Thank you! 🙏</div>
+  <div class="footer-msg">Thank you!</div>
   <div class="footer-sub">
     Visit us again<br>
     <span style="letter-spacing:1px">GREEN SWEETS</span>
@@ -247,7 +243,7 @@ export function buildCustomerSlipHTML(tokenNumber, items, notes, discountPercent
   ${bulkInfo && bulkInfo.customerName ? `
     <div class="center bold" style="font-size:12px;margin:2px 0">${bulkInfo.customerName}</div>` : ''}
   ${bulkInfo && bulkInfo.phone ? `
-    <div class="center small" style="color:#555">📞 ${bulkInfo.phone}</div>` : ''}
+    <div class="center small" style="color:#555">${bulkInfo.phone}</div>` : ''}
 
   <hr class="sep-solid">
 
@@ -290,16 +286,15 @@ export function buildCustomerSlipHTML(tokenNumber, items, notes, discountPercent
 
   ${bulkInfo && bulkInfo.schedule ? `
   <hr class="sep-dash">
-  <div class="small" style="color:#555">📅 Delivery: ${new Date(bulkInfo.schedule).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>` : ''}
+  <div class="small" style="color:#555">Delivery: ${new Date(bulkInfo.schedule).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>` : ''}
 
-  ${notes ? `<hr class="sep-dash"><div class="small" style="color:#555">📝 ${notes}</div>` : ''}
+  ${notes ? `<hr class="sep-dash"><div class="small" style="color:#555">Note: ${notes}</div>` : ''}
 
   <hr class="sep-dash">
-  <div class="stars">✦ ✦ ✦</div>
-  <div class="footer-msg">Thank You! 🙏</div>
+  <div class="footer-msg">Thank You!</div>
   <div class="footer-sub">
     Goods once sold will not be taken back<br>
-    📞 +91 98880 77154
+    +91 98880 77154
   </div>
   <div class="sep-double" style="margin-top:6px">★ ─────────────── ★</div>
 

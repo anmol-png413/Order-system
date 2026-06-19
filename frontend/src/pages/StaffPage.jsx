@@ -30,7 +30,7 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
   const balance = +(payable - advance).toFixed(2);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 py-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center px-4 py-4" onClick={onClose}>
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-sm flex flex-col animate-slide-up" style={{ maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 bg-purple-500/10">

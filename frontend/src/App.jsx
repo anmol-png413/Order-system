@@ -58,8 +58,8 @@ export default function App() {
           />
           <Suspense fallback={<Spinner />}>
             <Routes>
-              <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
-              <Route path="/cart" element={<PrivateRoute><CartPage /></PrivateRoute>} />
+              <Route path="/" element={<HomePage />} />
+              <Route path="/cart" element={<CartPage />} />
               <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
               <Route path="/staff" element={<RoleRoute allowed={['staff', 'admin']}><StaffPage /></RoleRoute>} />
               <Route path="/packing" element={<RoleRoute allowed={['packing', 'admin']}><PackingPage /></RoleRoute>} />

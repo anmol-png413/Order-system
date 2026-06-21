@@ -525,15 +525,15 @@ export default function AdminPage() {
                           <div className="flex gap-2 mt-3">
                             <button onClick={() => openProductModal(p)}
                               className="flex-1 btn-ghost text-xs py-2.5 flex items-center justify-center gap-1 min-h-[40px]">
-                              <Edit2 className="w-3.5 h-3.5" /> Edit
+                              <Edit2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Edit</span>
                             </button>
                             <button onClick={() => confirmDelete(p._id, p.name)}
                               className="flex-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 text-xs font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1 min-h-[40px]">
-                              <Trash2 className="w-3.5 h-3.5" /> Archive
+                              <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Archive</span>
                             </button>
                             <button onClick={() => setPermanentDeleteConfirm({ id: p._id, name: p.name })}
                               className="flex-1 bg-red-600/15 hover:bg-red-600/30 text-red-500 text-xs font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1 min-h-[40px]">
-                              <Trash2 className="w-3.5 h-3.5" /> Delete
+                              <Trash2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Delete</span>
                             </button>
                           </div>
                         </div>

@@ -13,6 +13,10 @@ router.get('/', protect, async (req, res) => {
 
     if (req.user.role === 'packing') {
       filter.status = { $in: ['pending', 'in-progress', 'completed'] };
+      filter.$or = [
+        { createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+        { 'bulk.phone': { $exists: true, $ne: '' }, status: { $ne: 'completed' } },
+      ];
     } else if (req.user.role === 'counter') {
       filter.status = 'completed';
       // Last 2 hours for counter
@@ -27,9 +31,13 @@ router.get('/', protect, async (req, res) => {
       const end = new Date(d);
       end.setHours(23, 59, 59, 999);
       filter.createdAt = { $gte: d, $lte: end };
-    } else if (req.user.role === 'packing') {
-      // 24-hour rolling window — prevents midnight data wipe on packing screen
-      filter.createdAt = { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) };
+    } else if (req.user.role === 'staff') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      filter.$or = [
+        { createdAt: { $gte: today } },
+        { 'bulk.phone': { $exists: true, $ne: '' }, status: { $ne: 'completed' } },
+      ];
     } else if (req.user.role !== 'admin') {
       const today = new Date();
       today.setHours(0, 0, 0, 0);

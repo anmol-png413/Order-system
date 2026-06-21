@@ -4,6 +4,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { ShoppingCart, ShoppingBag, Plus, Minus, X } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { getThumbUrl, getFullUrl } from '../utils/imageUtils';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" fill="%231a1a1a"/><text x="60" y="68" text-anchor="middle" font-size="40" fill="%23444">🍽️</text></svg>';
@@ -11,6 +12,7 @@ const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000
 export default function HomePage() {
   const navigate = useNavigate();
   const { addToCart, totalItems } = useCart();
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
@@ -33,7 +35,10 @@ export default function HomePage() {
   const closeModal = () => setSelected(null);
 
   const handleAddToCart = () => {
-    navigate('/login');
+    if (!user) { navigate('/login'); return; }
+    addToCart({ ...selected, quantity: qty });
+    closeModal();
+    toast.success(`${selected.name} added to cart!`);
   };
 
   return (

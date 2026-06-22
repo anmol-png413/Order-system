@@ -217,7 +217,7 @@ function StatusModal({ type, orders, onClose, onDelete, deleting }) {
                     <div className="text-4xl font-extrabold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>
                       #{order.tokenNumber}
                     </div>
-                    {!isPacking && (
+                    {false && !isPacking && (
                       <button
                         onClick={() => onDelete(order._id, order.tokenNumber)}
                         disabled={deleting === order._id}
@@ -611,7 +611,11 @@ const [cart, setCart] = useState([]);
       const orderData = { token: res.data.tokenNumber, items: [...cart], notes };
       setSuccessData(orderData);
       setTimeout(() => setSuccessData(null), 2000);
-      printOrderSlips(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk);
+      if (payload.bulk) {
+        printOrderSlips(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk);
+      } else {
+        printSlip(orderData.token, orderData.items, orderData.notes);
+      }
       setCart([]);
       setNotes('');
       setDiscountPercent(0);

@@ -8,7 +8,7 @@ import { getThumbUrl } from '../utils/imageUtils';
 
 const IMG_FALLBACK = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80"><rect width="80" height="80" fill="%231a1a1a"/><text x="40" y="44" text-anchor="middle" font-size="28" fill="%23444">🍽️</text></svg>';
 
-const TABS = ['Dashboard', 'Products', 'Users', 'Orders'];
+const TABS = ['Dashboard', 'Products', 'Users', 'Orders', 'Analytics'];
 const ROLES = ['staff', 'packing', 'counter', 'admin'];
 
 const STATUS_COLORS = {
@@ -38,6 +38,12 @@ export default function AdminPage() {
   const [deletingOrder, setDeletingOrder] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
 
+  // Analytics tab
+  const now = new Date();
+  const [analyticsMonth, setAnalyticsMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
   // Delete confirm
   const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
 
@@ -51,7 +57,17 @@ export default function AdminPage() {
     if (tab === 'Products') fetchProducts();
     if (tab === 'Users') fetchUsers();
     if (tab === 'Orders') fetchOrders();
+    if (tab === 'Analytics') fetchAnalytics(analyticsMonth);
   }, [tab]);
+
+  const fetchAnalytics = async (month) => {
+    setAnalyticsLoading(true);
+    try {
+      const res = await axios.get(`/api/orders/analytics?month=${month}`);
+      setAnalytics(res.data);
+    } catch { toast.error('Failed to load analytics'); }
+    finally { setAnalyticsLoading(false); }
+  };
 
   useSocket('admin', {
     'new-order':     (order)         => setOrders(prev => [order, ...prev]),
@@ -591,6 +607,82 @@ export default function AdminPage() {
                 </div>
               );
             })()}
+          </div>
+        )}
+
+        {/* ── ANALYTICS TAB ── */}
+        {tab === 'Analytics' && (
+          <div>
+            {/* Month picker */}
+            <div className="flex items-center gap-3 mb-6">
+              <TrendingUp className="w-5 h-5 text-orange-400" />
+              <h2 className="text-lg font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>Monthly Analytics</h2>
+              <input
+                type="month"
+                value={analyticsMonth}
+                max={`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`}
+                onChange={e => { setAnalyticsMonth(e.target.value); fetchAnalytics(e.target.value); }}
+                className="ml-auto bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
+              />
+            </div>
+
+            {analyticsLoading ? (
+              <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /></div>
+            ) : analytics ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Avg Order Value */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingUp className="w-4 h-4 text-orange-400" />
+                    <span className="text-zinc-400 text-sm font-medium">Average Order Value</span>
+                  </div>
+                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>₹{analytics.avgOrderValue.toLocaleString('en-IN')}</div>
+                  <div className="text-zinc-500 text-xs mt-1">Revenue ÷ Total orders</div>
+                </div>
+
+                {/* Avg Orders per Customer per Day */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart3 className="w-4 h-4 text-blue-400" />
+                    <span className="text-zinc-400 text-sm font-medium">Avg Orders / Customer / Day</span>
+                  </div>
+                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>{analytics.avgOrdersPerCustomerDaily}</div>
+                  <div className="text-zinc-500 text-xs mt-1">Over {analytics.daysInMonth} days · {analytics.totalCustomers} customers</div>
+                </div>
+
+                {/* Total Orders this month */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ShoppingBag className="w-4 h-4 text-green-400" />
+                    <span className="text-zinc-400 text-sm font-medium">Total Orders (Month)</span>
+                  </div>
+                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>{analytics.totalOrders}</div>
+                  <div className="text-zinc-500 text-xs mt-1">{analytics.avgOrdersPerCustomer} orders/customer avg</div>
+                </div>
+
+                {/* Total Customers */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Users className="w-4 h-4 text-purple-400" />
+                    <span className="text-zinc-400 text-sm font-medium">Total Customers (Month)</span>
+                  </div>
+                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>{analytics.totalCustomers}</div>
+                  <div className="text-zinc-500 text-xs mt-1">Unique bulk customers</div>
+                </div>
+
+                {/* Total Revenue */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Wallet className="w-4 h-4 text-yellow-400" />
+                    <span className="text-zinc-400 text-sm font-medium">Total Revenue (Month)</span>
+                  </div>
+                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
+                  <div className="text-zinc-500 text-xs mt-1">Payable amount</div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-20 text-zinc-600">No data for this month</div>
+            )}
           </div>
         )}
 

@@ -307,6 +307,63 @@ router.get('/reports', protect, restrictTo('admin'), async (req, res) => {
   }
 });
 
+// GET /api/orders/analytics — Admin: monthly analytics
+router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
+  try {
+    const { month } = req.query; // format: YYYY-MM
+    const TZ = '+05:30';
+
+    let start, end;
+    if (month) {
+      const [year, mon] = month.split('-').map(Number);
+      start = new Date(year, mon - 1, 1);
+      end   = new Date(year, mon, 1);
+    } else {
+      const now = new Date();
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end   = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    }
+
+    const [totals, dailyCounts, uniqueCustomers] = await Promise.all([
+      // Total orders + revenue
+      Order.aggregate([
+        { $match: { createdAt: { $gte: start, $lt: end } } },
+        { $group: { _id: null, totalOrders: { $sum: 1 }, totalRevenue: { $sum: '$payableAmount' } } },
+      ]),
+      // Orders per day
+      Order.aggregate([
+        { $match: { createdAt: { $gte: start, $lt: end } } },
+        { $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: TZ } },
+          count: { $sum: 1 },
+        }},
+      ]),
+      // Unique customers (bulk orders with phone)
+      Order.distinct('bulk.phone', {
+        createdAt: { $gte: start, $lt: end },
+        'bulk.phone': { $exists: true, $ne: '' },
+      }),
+    ]);
+
+    const totalOrders      = totals[0]?.totalOrders  || 0;
+    const totalRevenue     = totals[0]?.totalRevenue  || 0;
+    const daysInMonth      = Math.round((end - start) / (1000 * 60 * 60 * 24));
+    const totalCustomers   = uniqueCustomers.length;
+
+    res.json({
+      totalOrders,
+      totalRevenue,
+      avgOrderValue:              totalOrders > 0 ? +(totalRevenue / totalOrders).toFixed(2) : 0,
+      avgOrdersPerCustomerDaily:  totalCustomers > 0 ? +((totalOrders / totalCustomers) / daysInMonth).toFixed(3) : 0,
+      avgOrdersPerCustomer:       totalCustomers > 0 ? +(totalOrders / totalCustomers).toFixed(2) : 0,
+      totalCustomers,
+      daysInMonth,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /api/orders/customer/:phone — Admin: get all orders by customer phone
 router.get('/customer/:phone', protect, restrictTo('admin'), async (req, res) => {
   try {

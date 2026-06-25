@@ -174,8 +174,8 @@ router.delete('/:id', protect, restrictTo('staff', 'admin'), async (req, res) =>
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: 'Order not found' });
-    if (req.user.role !== 'admin' && order.status !== 'completed')
-      return res.status(400).json({ message: 'Only completed orders can be deleted' });
+    if (req.user.role !== 'admin' && order.status !== 'completed' && !order.isDelivered)
+      return res.status(400).json({ message: 'Only completed or delivered orders can be deleted' });
 
     await Order.findByIdAndDelete(req.params.id);
 

@@ -4,6 +4,18 @@ import axios from 'axios';
 // withCredentials globally — cookies automatically sent with every request
 axios.defaults.withCredentials = true;
 
+// Global 401 interceptor — redirect to login on session expiry
+axios.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401 && !err.config?.url?.includes('/api/auth/')) {
+      // Session expired — hard redirect to login
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {

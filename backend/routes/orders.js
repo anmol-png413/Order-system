@@ -307,6 +307,99 @@ router.get('/reports', protect, restrictTo('admin'), async (req, res) => {
   }
 });
 
+// GET /api/orders/bulk — get all bulk orders (staff + packing)
+router.get('/bulk', protect, async (req, res) => {
+  try {
+    const orders = await Order.find({ 'bulk.phone': { $exists: true, $ne: '' } })
+      .populate('items.product', 'name image')
+      .populate('createdBy', 'name')
+      .sort({ createdAt: -1 })
+      .limit(200);
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PATCH /api/orders/:id/deliver — mark bulk order as delivered
+router.patch('/:id/deliver', protect, restrictTo('staff', 'admin'), async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (!order.bulk?.phone) return res.status(400).json({ message: 'Not a bulk order' });
+
+    const deliveredAt = new Date();
+    const updated = await Order.findByIdAndUpdate(
+      req.params.id,
+      { isDelivered: true, deliveredAt },
+      { new: true }
+    ).populate('createdBy', 'name').populate('packedBy', 'name');
+
+    req.io.to('staff').emit('order-updated', updated);
+    req.io.to('admin').emit('order-updated', updated);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PATCH /api/orders/:id/bulk-status — update bulk packing status
+router.patch('/:id/bulk-status', protect, restrictTo('packing', 'admin'), async (req, res) => {
+  try {
+    const { bulkStatus } = req.body;
+    if (!['pending', 'in-progress', 'finished'].includes(bulkStatus))
+      return res.status(400).json({ message: 'Invalid bulk status' });
+
+    const updated = await Order.findByIdAndUpdate(
+      req.params.id,
+      { bulkStatus },
+      { new: true }
+    ).populate('createdBy', 'name').populate('packedBy', 'name');
+
+    if (!updated) return res.status(404).json({ message: 'Order not found' });
+
+    req.io.to('packing').emit('order-updated', updated);
+    req.io.to('staff').emit('order-updated', updated);
+    req.io.to('admin').emit('order-updated', updated);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// PUT /api/orders/:id/items — update bulk order items
+router.put('/:id/items', protect, restrictTo('staff', 'admin'), async (req, res) => {
+  try {
+    const { items, discountPercent } = req.body;
+    if (!items || items.length === 0)
+      return res.status(400).json({ message: 'Order must have at least one item' });
+
+    const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const parsedDiscount = Number(discountPercent) || 0;
+    const discountAmount = +(totalAmount * (parsedDiscount / 100)).toFixed(2);
+    const payableAmount = +(totalAmount - discountAmount).toFixed(2);
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const advance = order.bulk?.advance || 0;
+    const balance = +(payableAmount - advance).toFixed(2);
+
+    const updated = await Order.findByIdAndUpdate(
+      req.params.id,
+      { items, totalAmount, discountPercent: parsedDiscount, discountAmount, payableAmount, 'bulk.balance': balance },
+      { new: true }
+    ).populate('createdBy', 'name').populate('packedBy', 'name');
+
+    req.io.to('packing').emit('order-updated', updated);
+    req.io.to('staff').emit('order-updated', updated);
+    req.io.to('admin').emit('order-updated', updated);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /api/orders/analytics — Admin: monthly analytics
 router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
   try {

@@ -294,7 +294,7 @@ function StatusModal({ type, orders, onClose, onDelete, deleting }) {
 }
 
 // ── Cart Panel (shared logic, used in desktop + mobile) ──────────
-function CartPanel({ cart, notes, setNotes, discountPercent, setDiscountPercent, changeQty, placeOrder, placing, cartCount, cartTotal, discountAmount, totalAfterDiscount, onClear, showBulkModal, setShowBulkModal, bulkPhone }) {
+function CartPanel({ cart, notes, setNotes, discountPercent, setDiscountPercent, changeQty, placeOrder, placing, cartCount, cartTotal, discountAmount, totalAfterDiscount, onClear, showBulkModal, setShowBulkModal, bulkPhone, editingBulkOrder, saveEditedBulkOrder, cancelEditBulkOrder, onEditCartItem }) {
   const DISCOUNT_PRESETS = [0, 5, 10, 15, 20];
 
   return (
@@ -310,9 +310,16 @@ function CartPanel({ cart, notes, setNotes, discountPercent, setDiscountPercent,
           <>
             {cart.map((item, idx) => (
               <div key={idx} className="flex items-center gap-3 bg-zinc-800/60 rounded-xl p-2.5">
-                <img src={item.image || IMG_FALLBACK} alt={item.name}
-                  className="w-12 h-12 rounded-lg object-cover bg-zinc-700 flex-shrink-0"
-                  onError={e => { e.target.src = IMG_FALLBACK; }} />
+                <div className="relative flex-shrink-0 cursor-pointer" onClick={() => editingBulkOrder && onEditCartItem(idx)}>
+                  <img src={item.image || IMG_FALLBACK} alt={item.name}
+                    className={`w-12 h-12 rounded-lg object-cover bg-zinc-700 ${editingBulkOrder ? 'opacity-80' : ''}`}
+                    onError={e => { e.target.src = IMG_FALLBACK; }} />
+                  {editingBulkOrder && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg">
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </div>
+                  )}
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-zinc-200 truncate">{item.name}</p>
                   <p className="text-xs text-zinc-500">{item.quantityLabel || (item.unit === 'piece' ? `${item.quantity} pcs` : `${item.quantity} kg`)}</p>
@@ -320,7 +327,20 @@ function CartPanel({ cart, notes, setNotes, discountPercent, setDiscountPercent,
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => changeQty(idx, -1)} className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center"><Minus className="w-3 h-3 text-zinc-300" /></button>
-                  <span className="w-6 text-center text-sm font-bold text-white">{item.quantity}</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={e => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 1) changeQty(idx, val - item.quantity);
+                    }}
+                    onBlur={e => {
+                      const val = parseInt(e.target.value);
+                      if (isNaN(val) || val < 1) changeQty(idx, 1 - item.quantity);
+                    }}
+                    className="w-10 text-center text-sm font-bold text-white bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                   <button onClick={() => changeQty(idx, 1)} className="w-7 h-7 rounded-lg bg-zinc-700 hover:bg-zinc-600 flex items-center justify-center"><Plus className="w-3 h-3 text-zinc-300" /></button>
                 </div>
               </div>
@@ -420,12 +440,19 @@ function CartPanel({ cart, notes, setNotes, discountPercent, setDiscountPercent,
             </div>
           </div>
 
-          <button onClick={placeOrder} disabled={placing}
-            className="w-full btn-primary py-4 text-base flex items-center justify-center gap-2 disabled:opacity-60">
+          <button onClick={editingBulkOrder ? saveEditedBulkOrder : placeOrder} disabled={placing}
+            className={`w-full py-4 text-base flex items-center justify-center gap-2 disabled:opacity-60 rounded-xl font-bold transition-all ${editingBulkOrder ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'btn-primary'}`}>
             {placing
               ? <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
-              : <><CheckCircle className="w-5 h-5" /> Place Order</>}
+              : editingBulkOrder
+                ? <><CheckCircle className="w-5 h-5" /> Save & Reprint #{editingBulkOrder.tokenNumber}</>
+                : <><CheckCircle className="w-5 h-5" /> Place Order</>}
           </button>
+          {editingBulkOrder && (
+            <button onClick={cancelEditBulkOrder} className="w-full text-zinc-500 hover:text-red-400 text-sm py-1 transition-colors">
+              Cancel Edit
+            </button>
+          )}
           <button onClick={onClear} className="w-full flex items-center justify-center gap-1.5 text-zinc-600 hover:text-red-400 text-sm transition-colors py-1">
             <Trash2 className="w-3.5 h-3.5" /> Clear cart
           </button>
@@ -440,9 +467,10 @@ export default function StaffPage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState(['All']);
   const [activeCategory, setActiveCategory] = useState('All');
-const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState([]);
   const [notes, setNotes] = useState('');
   const [discountPercent, setDiscountPercent] = useState(0);
+  const [editingCartIdx, setEditingCartIdx] = useState(null);
 
   // Bulk order
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -468,6 +496,14 @@ const [cart, setCart] = useState([]);
   const [deleting, setDeleting] = useState(null);
   const [markingPaid, setMarkingPaid] = useState(null);
   const [showFloating, setShowFloating] = useState(true);
+
+  // Bulk Orders Panel
+  const [showBulkPanel, setShowBulkPanel] = useState(false);
+  const [bulkOrders, setBulkOrders] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [deliveringId, setDeliveringId] = useState(null);
+  const [deletingBulkId, setDeletingBulkId] = useState(null);
+  const [editingBulkOrder, setEditingBulkOrder] = useState(null);
 
   const fetchLiveOrders = useCallback(() => {
     axios.get('/api/orders').then(res => setLiveOrders(res.data)).catch(() => {});
@@ -534,6 +570,57 @@ const [cart, setCart] = useState([]);
     }
   };
 
+  const fetchBulkOrders = useCallback(async () => {
+    setBulkLoading(true);
+    try { const res = await axios.get('/api/orders/bulk'); setBulkOrders(res.data); }
+    catch { toast.error('Failed to load bulk orders'); }
+    finally { setBulkLoading(false); }
+  }, []);
+
+  const openBulkPanel = () => { setShowBulkPanel(true); fetchBulkOrders(); };
+
+  const deliverBulkOrder = async (order) => {
+    setDeliveringId(order._id);
+    try {
+      const res = await axios.patch(`/api/orders/${order._id}/deliver`);
+      setBulkOrders(prev => prev.map(o => o._id === order._id ? res.data : o));
+      toast.success(`#${order.tokenNumber} marked as delivered!`, { icon: '✅' });
+    } catch { toast.error('Failed to mark delivered'); }
+    finally { setDeliveringId(null); }
+  };
+
+  const deleteBulkOrder = async (orderId) => {
+    setDeletingBulkId(orderId);
+    try {
+      await axios.delete(`/api/orders/${orderId}`);
+      setBulkOrders(prev => prev.filter(o => o._id !== orderId));
+      toast.success('Bulk order removed');
+    } catch { toast.error('Failed to delete'); }
+    finally { setDeletingBulkId(null); }
+  };
+
+  const startEditBulkOrder = (order) => {
+    setEditingBulkOrder(order);
+    setCart(order.items.map(i => ({ ...i, product: i.product?._id || i.product })));
+    setDiscountPercent(order.discountPercent || 0);
+    setShowBulkPanel(false);
+    setCartOpen(true);
+    toast.success(`Editing order #${order.tokenNumber} — modify cart and save`);
+  };
+
+  const saveEditedBulkOrder = async () => {
+    if (!editingBulkOrder || cart.length === 0) return;
+    setPlacing(true);
+    try {
+      const res = await axios.put(`/api/orders/${editingBulkOrder._id}/items`, { items: cart, discountPercent });
+      setBulkOrders(prev => prev.map(o => o._id === editingBulkOrder._id ? res.data : o));
+      printOrderSlips(editingBulkOrder.tokenNumber, cart, editingBulkOrder.notes, discountPercent, editingBulkOrder.bulk);
+      toast.success(`Order #${editingBulkOrder.tokenNumber} updated & slip printed!`);
+      setCart([]); setDiscountPercent(0); setEditingBulkOrder(null); setEditingCartIdx(null); setCartOpen(false);
+    } catch { toast.error('Failed to update order'); }
+    finally { setPlacing(false); }
+  };
+
   const packingCount = liveOrders.filter(o => o.status === 'pending' || o.status === 'in-progress').length;
   const readyCount   = liveOrders.filter(o => o.status === 'completed').length;
 
@@ -560,13 +647,20 @@ const [cart, setCart] = useState([]);
     } else {
       item = { product: modalProduct._id, name: modalProduct.name, price: modalProduct.price, image: modalProduct.image, unit: modalProduct.unit, quantity: modalQty, quantityLabel: `${modalQty} pcs` };
     }
-    setCart(prev => {
-      const key = `${item.product}-${item.quantityLabel}`;
-      const existing = prev.find(i => `${i.product}-${i.quantityLabel}` === key);
-      if (existing) return prev.map(i => `${i.product}-${i.quantityLabel}` === key ? { ...i, quantity: i.quantity + item.quantity } : i);
-      return [...prev, item];
-    });
-    toast.success(`${modalProduct.name} added`);
+    if (editingCartIdx !== null) {
+      // Replace existing cart item (bulk edit mode)
+      setCart(prev => prev.map((i, n) => n === editingCartIdx ? item : i));
+      setEditingCartIdx(null);
+      toast.success(`${modalProduct.name} updated`);
+    } else {
+      setCart(prev => {
+        const key = `${item.product}-${item.quantityLabel}`;
+        const existing = prev.find(i => `${i.product}-${i.quantityLabel}` === key);
+        if (existing) return prev.map(i => `${i.product}-${i.quantityLabel}` === key ? { ...i, quantity: i.quantity + item.quantity } : i);
+        return [...prev, item];
+      });
+      toast.success(`${modalProduct.name} added`);
+    }
     setModalProduct(null);
   };
 
@@ -592,6 +686,19 @@ const [cart, setCart] = useState([]);
       else { setBulkName(''); setBulkPhone(''); setBulkAdvance(''); setBulkSchedule(''); }
     },
     bulkPhone,
+    editingBulkOrder,
+    saveEditedBulkOrder,
+    cancelEditBulkOrder: () => { setEditingBulkOrder(null); setCart([]); setDiscountPercent(0); setEditingCartIdx(null); setModalProduct(null); },
+    onEditCartItem: (idx) => {
+      const item = cart[idx];
+      const productId = typeof item.product === 'object' ? item.product._id : item.product;
+      const product = products.find(p => p._id === productId);
+      if (!product) { toast.error('Product not found'); return; }
+      setEditingCartIdx(idx);
+      setModalProduct(product);
+      setModalWeight(item.quantityLabel || '');
+      setModalQty(item.quantity || 1);
+    },
   };
 
   async function placeOrder() {
@@ -650,6 +757,10 @@ const [cart, setCart] = useState([]);
           className="flex-shrink-0 flex items-center gap-2 bg-zinc-800 hover:bg-green-500/20 hover:text-green-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700">
           <Bell className="w-4 h-4" /> Ready
           {readyCount > 0 && <span className="bg-green-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{readyCount}</span>}
+        </button>
+        <button onClick={openBulkPanel}
+          className="flex-shrink-0 flex items-center gap-2 bg-zinc-800 hover:bg-purple-500/20 hover:text-purple-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700">
+          <Users className="w-4 h-4" /> Bulk Orders
         </button>
       </div>
 
@@ -711,12 +822,123 @@ const [cart, setCart] = useState([]);
         />
       )}
 
+      {/* ── BULK ORDERS PANEL ── */}
+      {showBulkPanel && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center px-2 py-4" onClick={() => setShowBulkPanel(false)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-2xl flex flex-col animate-slide-up" style={{ maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-purple-500/20 rounded-xl flex items-center justify-center">
+                  <Users className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-white text-lg" style={{ fontFamily: 'Sora, sans-serif' }}>Bulk Orders</h2>
+                  <p className="text-xs text-zinc-500">{bulkOrders.length} orders</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={fetchBulkOrders} className="w-9 h-9 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-400 hover:text-white transition-all">
+                  <svg className={`w-4 h-4 ${bulkLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                </button>
+                <button onClick={() => setShowBulkPanel(false)} className="w-9 h-9 bg-zinc-800 hover:bg-zinc-700 rounded-xl flex items-center justify-center text-zinc-400">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="overflow-y-auto flex-1 p-4 space-y-3">
+              {bulkLoading && (
+                <div className="text-center py-12 text-zinc-500">Loading...</div>
+              )}
+              {!bulkLoading && bulkOrders.length === 0 && (
+                <div className="text-center py-12 text-zinc-500">No bulk orders yet</div>
+              )}
+              {!bulkLoading && bulkOrders.map(order => {
+                const isDelivered = order.isDelivered;
+                const scheduleDate = order.bulk?.schedule ? new Date(order.bulk.schedule) : null;
+                const isOverdue = scheduleDate && !isDelivered && scheduleDate < new Date();
+                return (
+                  <div key={order._id} className={`rounded-2xl border p-4 transition-all ${isDelivered ? 'bg-zinc-800/40 border-zinc-700/50 opacity-70' : 'bg-zinc-800 border-zinc-700'}`}>
+                    {/* Top row */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-white text-base" style={{ fontFamily: 'Sora, sans-serif' }}>#{order.tokenNumber}</span>
+                          <span className="font-semibold text-zinc-200 text-sm">{order.bulk?.customerName}</span>
+                          {isDelivered && <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full font-medium">Delivered ✓</span>}
+                          {!isDelivered && <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-medium">Pending</span>}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 flex-wrap">
+                          <span className="text-zinc-400 text-xs flex items-center gap-1"><Phone className="w-3 h-3" />{order.bulk?.phone}</span>
+                          {scheduleDate && (
+                            <span className={`text-xs flex items-center gap-1 ${isOverdue ? 'text-red-400' : 'text-zinc-400'}`}>
+                              <Calendar className="w-3 h-3" />
+                              {scheduleDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              {isOverdue && ' (Overdue)'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-white font-bold">₹{order.payableAmount?.toFixed(2)}</div>
+                        <div className="text-xs text-green-400">Adv: ₹{order.bulk?.advance?.toFixed(2)}</div>
+                        <div className="text-xs text-orange-400">Bal: ₹{order.bulk?.balance?.toFixed(2)}</div>
+                      </div>
+                    </div>
+
+                    {/* Items */}
+                    <div className="bg-zinc-900/60 rounded-xl px-3 py-2 mb-3 space-y-1">
+                      {order.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-sm">
+                          <span className="text-zinc-300">{item.name} <span className="text-zinc-500">× {fmtQty(item.quantity, item.quantityLabel, item.unit)}</span></span>
+                          <span className="text-zinc-300 font-medium">₹{(item.price * item.quantity).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Actions */}
+                    {!isDelivered ? (
+                      <div className="flex gap-2">
+                        <button onClick={() => startEditBulkOrder(order)}
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-semibold py-2.5 rounded-xl transition-all">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          Edit
+                        </button>
+                        <button onClick={() => deliverBulkOrder(order)} disabled={deliveringId === order._id}
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-50">
+                          {deliveringId === order._id
+                            ? <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                            : <CheckCircle className="w-4 h-4" />}
+                          Delivered
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end">
+                        <button onClick={() => deleteBulkOrder(order._id)} disabled={deletingBulkId === order._id}
+                          className="flex items-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-sm font-medium px-4 py-2 rounded-xl transition-all disabled:opacity-50">
+                          {deletingBulkId === order._id
+                            ? <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+                            : <Trash2 className="w-4 h-4" />}
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Product Modal */}
       {modalProduct && (
-        <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-start justify-center px-4 pb-4 pt-20 overflow-y-auto" onClick={() => setModalProduct(null)}>
+        <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-start justify-center px-4 pb-4 pt-20 overflow-y-auto" onClick={() => { setModalProduct(null); setEditingCartIdx(null); }}>
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm flex flex-col animate-slide-up relative" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-end px-3 py-2 flex-shrink-0 rounded-t-2xl bg-zinc-900">
-              <button onClick={() => setModalProduct(null)} className="w-9 h-9 bg-zinc-800 hover:bg-zinc-700 rounded-full flex items-center justify-center text-zinc-300 hover:text-white transition-all">
+              <button onClick={() => { setModalProduct(null); setEditingCartIdx(null); }} className="w-9 h-9 bg-zinc-800 hover:bg-zinc-700 rounded-full flex items-center justify-center text-zinc-300 hover:text-white transition-all">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -820,9 +1042,11 @@ const [cart, setCart] = useState([]);
             <div className="p-4 border-t border-zinc-800 flex-shrink-0">
               <button onClick={addFromModal} className="w-full btn-primary py-4 flex items-center justify-center gap-2 text-base">
                 <ShoppingCart className="w-5 h-5" />
-                {modalProduct.unit !== 'piece'
-                  ? `Add${modalQty > 1 ? ` ×${modalQty}` : ''} — ${parseWeightToKg(modalWeight) ? `₹${(modalProduct.price * parseWeightToKg(modalWeight) * modalQty).toFixed(2)}` : 'enter weight'}`
-                  : `Add to Cart — ₹${(modalProduct.price * modalQty).toFixed(2)}`}
+                {editingCartIdx !== null
+                  ? `✓ Update — ${parseWeightToKg(modalWeight) ? `₹${(modalProduct.price * parseWeightToKg(modalWeight) * modalQty).toFixed(2)}` : modalProduct.unit === 'piece' ? `₹${(modalProduct.price * modalQty).toFixed(2)}` : 'enter weight'}`
+                  : modalProduct.unit !== 'piece'
+                    ? `Add${modalQty > 1 ? ` ×${modalQty}` : ''} — ${parseWeightToKg(modalWeight) ? `₹${(modalProduct.price * parseWeightToKg(modalWeight) * modalQty).toFixed(2)}` : 'enter weight'}`
+                    : `Add to Cart — ₹${(modalProduct.price * modalQty).toFixed(2)}`}
               </button>
             </div>
           </div>

@@ -36,6 +36,9 @@ const orderSchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     packedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     packedAt: { type: Date },
+    isDelivered: { type: Boolean, default: false },
+    deliveredAt: { type: Date },
+    bulkStatus: { type: String, enum: ['pending', 'in-progress', 'finished'], default: 'pending' },
   },
   { timestamps: true }
 );

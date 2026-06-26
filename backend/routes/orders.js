@@ -400,12 +400,58 @@ router.put('/:id/items', protect, restrictTo('staff', 'admin'), async (req, res)
   }
 });
 
-// GET /api/orders/analytics — Admin: monthly analytics
+// GET /api/orders/analytics — Admin: today or monthly analytics
 router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
   try {
-    const { month } = req.query; // format: YYYY-MM
+    const { type = 'monthly', month, date } = req.query;
     const TZ = '+05:30';
 
+    // ── TODAY ──────────────────────────────────────────────────────
+    if (type === 'today') {
+      let dayStart, dayEnd;
+      if (date) {
+        dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
+        dayEnd   = new Date(date); dayEnd.setHours(23, 59, 59, 999);
+      } else {
+        dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+        dayEnd   = new Date(); dayEnd.setHours(23, 59, 59, 999);
+      }
+
+      const [totals, items, peakHours] = await Promise.all([
+        Order.aggregate([
+          { $match: { createdAt: { $gte: dayStart, $lte: dayEnd } } },
+          { $group: { _id: null, totalOrders: { $sum: 1 }, totalSales: { $sum: '$payableAmount' } } },
+        ]),
+        Order.aggregate([
+          { $match: { createdAt: { $gte: dayStart, $lte: dayEnd } } },
+          { $unwind: '$items' },
+          { $group: {
+            _id: '$items.name',
+            quantitySold: { $sum: '$items.quantity' },
+            revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
+          }},
+          { $sort: { revenue: -1 } },
+        ]),
+        Order.aggregate([
+          { $match: { createdAt: { $gte: dayStart, $lte: dayEnd } } },
+          { $group: {
+            _id: { $hour: { date: '$createdAt', timezone: TZ } },
+            count: { $sum: 1 },
+          }},
+          { $sort: { _id: 1 } },
+        ]),
+      ]);
+
+      return res.json({
+        type: 'today',
+        totalOrders: totals[0]?.totalOrders || 0,
+        totalSales:  +(totals[0]?.totalSales  || 0).toFixed(2),
+        items: items.map(i => ({ name: i._id, quantitySold: i.quantitySold, revenue: +i.revenue.toFixed(2) })),
+        peakHours: peakHours.map(h => ({ hour: h._id, count: h.count })),
+      });
+    }
+
+    // ── MONTHLY ────────────────────────────────────────────────────
     let start, end;
     if (month) {
       const [year, mon] = month.split('-').map(Number);
@@ -416,41 +462,49 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
       start = new Date(now.getFullYear(), now.getMonth(), 1);
       end   = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     }
+    const prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+    const prevEnd   = new Date(start);
 
-    const [totals, dailyCounts, uniqueCustomers] = await Promise.all([
-      // Total orders + revenue
+    const [totals, items, prevTotals] = await Promise.all([
       Order.aggregate([
         { $match: { createdAt: { $gte: start, $lt: end } } },
         { $group: { _id: null, totalOrders: { $sum: 1 }, totalRevenue: { $sum: '$payableAmount' } } },
       ]),
-      // Orders per day
       Order.aggregate([
         { $match: { createdAt: { $gte: start, $lt: end } } },
+        { $unwind: '$items' },
         { $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: TZ } },
-          count: { $sum: 1 },
+          _id: '$items.name',
+          quantitySold: { $sum: '$items.quantity' },
+          revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
         }},
+        { $sort: { revenue: -1 } },
       ]),
-      // Unique customers (bulk orders with phone)
-      Order.distinct('bulk.phone', {
-        createdAt: { $gte: start, $lt: end },
-        'bulk.phone': { $exists: true, $ne: '' },
-      }),
+      Order.aggregate([
+        { $match: { createdAt: { $gte: prevStart, $lt: prevEnd } } },
+        { $group: { _id: null, totalOrders: { $sum: 1 }, totalRevenue: { $sum: '$payableAmount' } } },
+      ]),
     ]);
 
-    const totalOrders      = totals[0]?.totalOrders  || 0;
-    const totalRevenue     = totals[0]?.totalRevenue  || 0;
-    const daysInMonth      = Math.round((end - start) / (1000 * 60 * 60 * 24));
-    const totalCustomers   = uniqueCustomers.length;
+    const totalOrders  = totals[0]?.totalOrders  || 0;
+    const totalRevenue = totals[0]?.totalRevenue  || 0;
+    const prevOrders   = prevTotals[0]?.totalOrders  || 0;
+    const prevRevenue  = prevTotals[0]?.totalRevenue || 0;
+    const avgOrderValue     = totalOrders > 0 ? +(totalRevenue / totalOrders).toFixed(2) : 0;
+    const prevAvgOrderValue = prevOrders  > 0 ? +(prevRevenue  / prevOrders ).toFixed(2) : 0;
+    const growthPct = (curr, prev) => prev > 0 ? +(((curr - prev) / prev) * 100).toFixed(1) : null;
 
     res.json({
+      type: 'monthly',
       totalOrders,
       totalRevenue,
-      avgOrderValue:              totalOrders > 0 ? +(totalRevenue / totalOrders).toFixed(2) : 0,
-      avgOrdersPerCustomerDaily:  totalCustomers > 0 ? +((totalOrders / totalCustomers) / daysInMonth).toFixed(3) : 0,
-      avgOrdersPerCustomer:       totalCustomers > 0 ? +(totalOrders / totalCustomers).toFixed(2) : 0,
-      totalCustomers,
-      daysInMonth,
+      avgOrderValue,
+      items: items.map(i => ({ name: i._id, quantitySold: i.quantitySold, revenue: +i.revenue.toFixed(2) })),
+      growth: {
+        revenue: growthPct(totalRevenue, prevRevenue),
+        orders:  growthPct(totalOrders,  prevOrders),
+        aov:     growthPct(avgOrderValue, prevAvgOrderValue),
+      },
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

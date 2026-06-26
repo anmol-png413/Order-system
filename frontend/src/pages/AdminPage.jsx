@@ -40,7 +40,10 @@ export default function AdminPage() {
 
   // Analytics tab
   const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const [analyticsView, setAnalyticsView] = useState('today'); // 'today' | 'monthly'
   const [analyticsMonth, setAnalyticsMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  const [analyticsDate, setAnalyticsDate] = useState(todayStr);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
@@ -57,13 +60,17 @@ export default function AdminPage() {
     if (tab === 'Products') fetchProducts();
     if (tab === 'Users') fetchUsers();
     if (tab === 'Orders') fetchOrders();
-    if (tab === 'Analytics') fetchAnalytics(analyticsMonth);
+    if (tab === 'Analytics') fetchAnalytics(analyticsView, analyticsDate, analyticsMonth);
   }, [tab]);
 
-  const fetchAnalytics = async (month) => {
+  const fetchAnalytics = async (view, date, month) => {
     setAnalyticsLoading(true);
+    setAnalytics(null);
     try {
-      const res = await axios.get(`/api/orders/analytics?month=${month}`);
+      const url = view === 'today'
+        ? `/api/orders/analytics?type=today&date=${date}`
+        : `/api/orders/analytics?type=monthly&month=${month}`;
+      const res = await axios.get(url);
       setAnalytics(res.data);
     } catch { toast.error('Failed to load analytics'); }
     finally { setAnalyticsLoading(false); }
@@ -613,75 +620,202 @@ export default function AdminPage() {
         {/* ── ANALYTICS TAB ── */}
         {tab === 'Analytics' && (
           <div>
-            {/* Month picker */}
-            <div className="flex items-center gap-3 mb-6">
-              <TrendingUp className="w-5 h-5 text-orange-400" />
-              <h2 className="text-lg font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>Monthly Analytics</h2>
-              <input
-                type="month"
-                value={analyticsMonth}
-                max={`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`}
-                onChange={e => { setAnalyticsMonth(e.target.value); fetchAnalytics(e.target.value); }}
-                className="ml-auto bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-500"
-              />
+            {/* Sub-tabs */}
+            <div className="flex items-center gap-2 mb-5">
+              {['today', 'monthly'].map(v => (
+                <button key={v} onClick={() => {
+                  setAnalyticsView(v);
+                  fetchAnalytics(v, analyticsDate, analyticsMonth);
+                }}
+                  className={`px-5 py-2 rounded-xl text-sm font-bold transition-all capitalize ${
+                    analyticsView === v ? 'bg-orange-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-700'
+                  }`} style={{ fontFamily: 'Sora, sans-serif' }}>
+                  {v === 'today' ? '📅 Today' : '📆 Monthly'}
+                </button>
+              ))}
+
+              {/* Date / Month picker */}
+              {analyticsView === 'today' ? (
+                <input type="date" value={analyticsDate} max={todayStr}
+                  onChange={e => { setAnalyticsDate(e.target.value); fetchAnalytics('today', e.target.value, analyticsMonth); }}
+                  className="ml-auto bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-500" />
+              ) : (
+                <input type="month" value={analyticsMonth}
+                  max={`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`}
+                  onChange={e => { setAnalyticsMonth(e.target.value); fetchAnalytics('monthly', analyticsDate, e.target.value); }}
+                  className="ml-auto bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-500" />
+              )}
             </div>
 
             {analyticsLoading ? (
               <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" /></div>
             ) : analytics ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Avg Order Value */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <TrendingUp className="w-4 h-4 text-orange-400" />
-                    <span className="text-zinc-400 text-sm font-medium">Average Order Value</span>
-                  </div>
-                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>₹{analytics.avgOrderValue.toLocaleString('en-IN')}</div>
-                  <div className="text-zinc-500 text-xs mt-1">Revenue ÷ Total orders</div>
-                </div>
+              <div className="space-y-6">
 
-                {/* Avg Orders per Customer per Day */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <BarChart3 className="w-4 h-4 text-blue-400" />
-                    <span className="text-zinc-400 text-sm font-medium">Avg Orders / Customer / Day</span>
-                  </div>
-                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>{analytics.avgOrdersPerCustomerDaily}</div>
-                  <div className="text-zinc-500 text-xs mt-1">Over {analytics.daysInMonth} days · {analytics.totalCustomers} customers</div>
-                </div>
+                {/* ── TODAY SECTION ── */}
+                {analytics.type === 'today' && (
+                  <>
+                    {/* Metric cards */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Wallet className="w-4 h-4 text-yellow-400" />
+                          <span className="text-zinc-400 text-sm font-medium">Total Sales</span>
+                        </div>
+                        <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>₹{analytics.totalSales.toLocaleString('en-IN')}</div>
+                        <div className="text-zinc-500 text-xs mt-1">Payable amount today</div>
+                      </div>
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ShoppingBag className="w-4 h-4 text-green-400" />
+                          <span className="text-zinc-400 text-sm font-medium">Total Orders</span>
+                        </div>
+                        <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>{analytics.totalOrders}</div>
+                        <div className="text-zinc-500 text-xs mt-1">Orders placed today</div>
+                      </div>
+                    </div>
 
-                {/* Total Orders this month */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <ShoppingBag className="w-4 h-4 text-green-400" />
-                    <span className="text-zinc-400 text-sm font-medium">Total Orders (Month)</span>
-                  </div>
-                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>{analytics.totalOrders}</div>
-                  <div className="text-zinc-500 text-xs mt-1">{analytics.avgOrdersPerCustomer} orders/customer avg</div>
-                </div>
+                    {/* Items sold today */}
+                    {analytics.items.length > 0 && (
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-orange-400" /> Items Sold Today
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-zinc-500 text-xs uppercase tracking-wide border-b border-zinc-800">
+                                <th className="pb-2 text-left">Item Name</th>
+                                <th className="pb-2 text-right">Qty Sold</th>
+                                <th className="pb-2 text-right">Revenue</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-800/60">
+                              {analytics.items.map((item, i) => (
+                                <tr key={i} className="hover:bg-zinc-800/30">
+                                  <td className="py-2.5 text-zinc-200 font-medium">{item.name}</td>
+                                  <td className="py-2.5 text-right text-zinc-400">{item.quantitySold}</td>
+                                  <td className="py-2.5 text-right text-orange-400 font-semibold">₹{item.revenue.toLocaleString('en-IN')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
 
-                {/* Total Customers */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Users className="w-4 h-4 text-purple-400" />
-                    <span className="text-zinc-400 text-sm font-medium">Total Customers (Month)</span>
-                  </div>
-                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>{analytics.totalCustomers}</div>
-                  <div className="text-zinc-500 text-xs mt-1">Unique bulk customers</div>
-                </div>
+                    {/* Peak Hours */}
+                    {analytics.peakHours.length > 0 && (
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2">
+                          <TrendingUp className="w-4 h-4 text-blue-400" /> Peak Hours
+                        </h3>
+                        <div className="space-y-2">
+                          {(() => {
+                            const max = Math.max(...analytics.peakHours.map(h => h.count));
+                            return analytics.peakHours.map(h => (
+                              <div key={h.hour} className="flex items-center gap-3">
+                                <span className="text-zinc-400 text-xs w-14 flex-shrink-0">
+                                  {String(h.hour).padStart(2,'0')}:00
+                                </span>
+                                <div className="flex-1 bg-zinc-800 rounded-full h-5 overflow-hidden">
+                                  <div className="h-full bg-orange-500 rounded-full transition-all"
+                                    style={{ width: `${(h.count / max) * 100}%` }} />
+                                </div>
+                                <span className="text-zinc-300 text-xs font-bold w-8 text-right">{h.count}</span>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+                    )}
 
-                {/* Total Revenue */}
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Wallet className="w-4 h-4 text-yellow-400" />
-                    <span className="text-zinc-400 text-sm font-medium">Total Revenue (Month)</span>
-                  </div>
-                  <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
-                  <div className="text-zinc-500 text-xs mt-1">Payable amount</div>
-                </div>
+                    {analytics.totalOrders === 0 && (
+                      <div className="text-center py-16 text-zinc-600">No orders on this date</div>
+                    )}
+                  </>
+                )}
+
+                {/* ── MONTHLY SECTION ── */}
+                {analytics.type === 'monthly' && (
+                  <>
+                    {/* Metric cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Wallet className="w-4 h-4 text-yellow-400" />
+                          <span className="text-zinc-400 text-sm font-medium">Total Sales</span>
+                        </div>
+                        <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>₹{analytics.totalRevenue.toLocaleString('en-IN')}</div>
+                        {analytics.growth.revenue !== null && (
+                          <div className={`text-xs mt-1 font-semibold ${analytics.growth.revenue >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {analytics.growth.revenue >= 0 ? '+' : ''}{analytics.growth.revenue}% vs last month
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ShoppingBag className="w-4 h-4 text-green-400" />
+                          <span className="text-zinc-400 text-sm font-medium">Total Orders</span>
+                        </div>
+                        <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>{analytics.totalOrders}</div>
+                        {analytics.growth.orders !== null && (
+                          <div className={`text-xs mt-1 font-semibold ${analytics.growth.orders >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {analytics.growth.orders >= 0 ? '+' : ''}{analytics.growth.orders}% vs last month
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingUp className="w-4 h-4 text-orange-400" />
+                          <span className="text-zinc-400 text-sm font-medium">Avg Order Value</span>
+                        </div>
+                        <div className="text-3xl font-black text-white" style={{ fontFamily: 'Sora, sans-serif' }}>₹{analytics.avgOrderValue.toLocaleString('en-IN')}</div>
+                        {analytics.growth.aov !== null && (
+                          <div className={`text-xs mt-1 font-semibold ${analytics.growth.aov >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {analytics.growth.aov >= 0 ? '+' : ''}{analytics.growth.aov}% vs last month
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Items sold this month */}
+                    {analytics.items.length > 0 && (
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+                        <h3 className="font-bold text-white text-sm mb-4 flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-orange-400" /> Items Sold This Month
+                        </h3>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-zinc-500 text-xs uppercase tracking-wide border-b border-zinc-800">
+                                <th className="pb-2 text-left">Item Name</th>
+                                <th className="pb-2 text-right">Qty Sold</th>
+                                <th className="pb-2 text-right">Revenue</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-800/60">
+                              {analytics.items.map((item, i) => (
+                                <tr key={i} className="hover:bg-zinc-800/30">
+                                  <td className="py-2.5 text-zinc-200 font-medium">{item.name}</td>
+                                  <td className="py-2.5 text-right text-zinc-400">{item.quantitySold}</td>
+                                  <td className="py-2.5 text-right text-orange-400 font-semibold">₹{item.revenue.toLocaleString('en-IN')}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {analytics.totalOrders === 0 && (
+                      <div className="text-center py-16 text-zinc-600">No orders this month</div>
+                    )}
+                  </>
+                )}
               </div>
             ) : (
-              <div className="text-center py-20 text-zinc-600">No data for this month</div>
+              <div className="text-center py-20 text-zinc-600">No data available</div>
             )}
           </div>
         )}

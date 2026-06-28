@@ -236,7 +236,7 @@ export function buildCustomerSlipHTML(tokenNumber, items, notes, discountPercent
   ${shopHeader(now)}
 
   <div class="token-box">
-    <div class="token-label">Bill No. / Token</div>
+    <div class="token-label">Token Number</div>
     <div class="token-num">#${tokenNumber}</div>
   </div>
 

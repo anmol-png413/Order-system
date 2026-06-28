@@ -38,6 +38,9 @@ export default function AdminPage() {
   const [deletingOrder, setDeletingOrder] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
 
+  // Orders tab month filter
+  const [orderMonth, setOrderMonth] = useState(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
+
   // Analytics tab
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -112,6 +115,21 @@ export default function AdminPage() {
       fetchStats();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Bulk delete failed');
+    } finally { setBulkLoading(false); }
+  };
+
+  const deleteByMonth = async (month) => {
+    const [year, mon] = month.split('-');
+    const label = new Date(year, mon - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+    if (!window.confirm(`Delete ALL orders from ${label}? This cannot be undone.`)) return;
+    setBulkLoading(true);
+    try {
+      const res = await axios.delete('/api/orders/bulk', { data: { month } });
+      toast.success(res.data.message);
+      fetchOrders();
+      fetchStats();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Delete failed');
     } finally { setBulkLoading(false); }
   };
 
@@ -694,7 +712,7 @@ export default function AdminPage() {
                               {analytics.items.map((item, i) => (
                                 <tr key={i} className="hover:bg-zinc-800/30">
                                   <td className="py-2.5 text-zinc-200 font-medium">{item.name}</td>
-                                  <td className="py-2.5 text-right text-zinc-400">{item.quantitySold}</td>
+                                  <td className="py-2.5 text-right text-zinc-400">{item.unit === 'piece' ? `${item.quantitySold} pcs` : `${item.quantitySold} kg`}</td>
                                   <td className="py-2.5 text-right text-orange-400 font-semibold">₹{item.revenue.toLocaleString('en-IN')}</td>
                                 </tr>
                               ))}
@@ -798,7 +816,7 @@ export default function AdminPage() {
                               {analytics.items.map((item, i) => (
                                 <tr key={i} className="hover:bg-zinc-800/30">
                                   <td className="py-2.5 text-zinc-200 font-medium">{item.name}</td>
-                                  <td className="py-2.5 text-right text-zinc-400">{item.quantitySold}</td>
+                                  <td className="py-2.5 text-right text-zinc-400">{item.unit === 'piece' ? `${item.quantitySold} pcs` : `${item.quantitySold} kg`}</td>
                                   <td className="py-2.5 text-right text-orange-400 font-semibold">₹{item.revenue.toLocaleString('en-IN')}</td>
                                 </tr>
                               ))}
@@ -823,43 +841,32 @@ export default function AdminPage() {
         {/* ── ORDERS TAB ── */}
         {tab === 'Orders' && (
           <div>
-            <div className="flex items-center justify-between mb-5">
+            {(() => {
+              const filteredOrders = orders.filter(o => o.createdAt?.slice(0, 7) === orderMonth);
+              const monthLabel = new Date(orderMonth + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+              return (
+            <>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
               <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'Sora, sans-serif' }}>
                 All Orders
-                <span className="ml-3 text-sm font-normal text-zinc-500">{orders.length} total</span>
+                <span className="ml-3 text-sm font-normal text-zinc-500">{filteredOrders.length} orders in {monthLabel}</span>
               </h2>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Month picker */}
+                <input type="month" value={orderMonth}
+                  max={`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`}
+                  onChange={e => setOrderMonth(e.target.value)}
+                  className="bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-500 min-h-[44px]" />
                 <button onClick={fetchOrders} className="btn-ghost text-sm min-h-[44px]">Refresh</button>
-                {/* Bulk delete dropdown */}
-                <div className="relative group">
-                  <button
-                    disabled={bulkLoading}
-                    className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all min-h-[44px] disabled:opacity-50"
-                    style={{ fontFamily: 'Sora, sans-serif' }}
-                  >
-                    {bulkLoading ? (
-                      <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                    Delete
-                    <span className="text-xs">▾</span>
-                  </button>
-                  {/* Dropdown */}
-                  <div className="absolute right-0 top-full mt-1 w-44 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-                    {[
-                      { label: 'Delete 10 orders', count: 10 },
-                      { label: 'Delete 50 orders', count: 50 },
-                      { label: 'Delete ALL orders', count: 'all' },
-                    ].map(opt => (
-                      <button key={opt.count}
-                        onClick={() => bulkDelete(opt.count)}
-                        className={`w-full text-left px-4 py-3 text-sm transition-colors hover:bg-zinc-800 ${opt.count === 'all' ? 'text-red-400 font-semibold border-t border-zinc-800' : 'text-zinc-300'}`}>
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Delete month button */}
+                <button onClick={() => deleteByMonth(orderMonth)} disabled={bulkLoading || filteredOrders.length === 0}
+                  className="flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all min-h-[44px] disabled:opacity-50"
+                  style={{ fontFamily: 'Sora, sans-serif' }}>
+                  {bulkLoading
+                    ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                    : <Trash2 className="w-4 h-4" />}
+                  Delete {monthLabel}
+                </button>
               </div>
             </div>
 
@@ -867,14 +874,14 @@ export default function AdminPage() {
               <div className="flex items-center justify-center py-24">
                 <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
               </div>
-            ) : orders.length === 0 ? (
+            ) : filteredOrders.length === 0 ? (
               <div className="text-center py-16 text-zinc-600">
                 <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p>No orders today</p>
+                <p>No orders in {monthLabel}</p>
               </div>
             ) : (
               <div className="space-y-2">
-                {orders.map(order => (
+                {filteredOrders.map(order => (
                   <div key={order._id} className={`card px-3 py-3 flex items-start gap-3 ${order.bulk?.phone ? 'border-purple-500/30 bg-purple-500/5' : ''}`}>
                     {/* Token */}
                     <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${order.bulk?.phone ? 'bg-purple-500/20' : 'bg-zinc-800'}`}>
@@ -950,6 +957,9 @@ export default function AdminPage() {
                 ))}
               </div>
             )}
+            </>
+              );
+            })()}
           </div>
         )}
 

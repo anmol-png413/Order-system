@@ -164,8 +164,8 @@ function BulkOrderModal({ onClose, bulkName, setBulkName, bulkPhone, setBulkPhon
 function StatusModal({ type, orders, onClose, onDelete, deleting }) {
   const isPacking = type === 'packing';
   const filtered = isPacking
-    ? orders.filter(o => o.status === 'pending' || o.status === 'in-progress')
-    : orders.filter(o => o.status === 'completed');
+    ? orders.filter(o => (o.status === 'pending' || o.status === 'in-progress') && !o.bulk?.customerName)
+    : orders.filter(o => o.status === 'completed' && !o.bulk?.customerName);
 
   const timeSince = (date) => {
     const mins = Math.floor((Date.now() - new Date(date)) / 60000);
@@ -621,8 +621,9 @@ export default function StaffPage() {
     finally { setPlacing(false); }
   };
 
-  const packingCount = liveOrders.filter(o => o.status === 'pending' || o.status === 'in-progress').length;
-  const readyCount   = liveOrders.filter(o => o.status === 'completed').length;
+  const packingCount = liveOrders.filter(o => (o.status === 'pending' || o.status === 'in-progress') && !o.bulk?.customerName).length;
+  const readyCount   = liveOrders.filter(o => o.status === 'completed' && !o.bulk?.customerName).length;
+  const bulkCount    = liveOrders.filter(o => o.bulk?.customerName && !o.isDelivered).length;
 
   const filtered = products.filter(p =>
     activeCategory === 'All' || p.category === activeCategory
@@ -718,8 +719,8 @@ export default function StaffPage() {
       const orderData = { token: res.data.tokenNumber, items: [...cart], notes };
       setSuccessData(orderData);
       setTimeout(() => setSuccessData(null), 2000);
-      if (payload.bulk) {
-        printOrderSlips(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk);
+      if (payload.bulk || discountPercent > 0) {
+        printOrderSlips(orderData.token, orderData.items, orderData.notes, discountPercent, payload.bulk || null);
       } else {
         printSlip(orderData.token, orderData.items, orderData.notes);
       }
@@ -761,6 +762,7 @@ export default function StaffPage() {
         <button onClick={openBulkPanel}
           className="flex-shrink-0 flex items-center gap-2 bg-zinc-800 hover:bg-purple-500/20 hover:text-purple-400 text-zinc-400 text-sm font-semibold px-4 py-2 rounded-xl transition-all border border-zinc-700">
           <Users className="w-4 h-4" /> Bulk Orders
+          {bulkCount > 0 && <span className="bg-purple-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">{bulkCount}</span>}
         </button>
       </div>
 
@@ -868,7 +870,9 @@ export default function StaffPage() {
                           <span className="font-bold text-white text-base" style={{ fontFamily: 'Sora, sans-serif' }}>#{order.tokenNumber}</span>
                           <span className="font-semibold text-zinc-200 text-sm">{order.bulk?.customerName}</span>
                           {isDelivered && <span className="text-xs bg-green-500/20 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full font-medium">Delivered ✓</span>}
-                          {!isDelivered && <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-medium">Pending</span>}
+                          {!isDelivered && order.bulkStatus === 'finished' && <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-medium">Packed ✓</span>}
+                          {!isDelivered && order.bulkStatus === 'in-progress' && <span className="text-xs bg-orange-500/20 text-orange-300 border border-orange-500/30 px-2 py-0.5 rounded-full font-medium">Packing...</span>}
+                          {!isDelivered && (!order.bulkStatus || order.bulkStatus === 'pending') && <span className="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded-full font-medium">Pending</span>}
                         </div>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
                           <span className="text-zinc-400 text-xs flex items-center gap-1"><Phone className="w-3 h-3" />{order.bulk?.phone}</span>
@@ -901,11 +905,13 @@ export default function StaffPage() {
                     {/* Actions */}
                     {!isDelivered ? (
                       <div className="flex gap-2">
-                        <button onClick={() => startEditBulkOrder(order)}
-                          className="flex-1 flex items-center justify-center gap-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-semibold py-2.5 rounded-xl transition-all">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          Edit
-                        </button>
+                        {order.bulkStatus !== 'finished' && (
+                          <button onClick={() => startEditBulkOrder(order)}
+                            className="flex-1 flex items-center justify-center gap-1.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-sm font-semibold py-2.5 rounded-xl transition-all">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            Edit
+                          </button>
+                        )}
                         <button onClick={() => deliverBulkOrder(order)} disabled={deliveringId === order._id}
                           className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold py-2.5 rounded-xl transition-all disabled:opacity-50">
                           {deliveringId === order._id

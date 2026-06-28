@@ -150,9 +150,16 @@ router.patch('/:id/status', protect, restrictTo('packing', 'admin'), async (req,
 // DELETE /api/orders/bulk — Admin bulk delete (MUST be before /:id)
 router.delete('/bulk', protect, restrictTo('admin'), async (req, res) => {
   try {
-    const { count } = req.body;
+    const { count, month } = req.body;
     let deleted = 0;
-    if (count === 'all') {
+
+    if (month) {
+      const [year, mon] = month.split('-').map(Number);
+      const start = new Date(year, mon - 1, 1);
+      const end   = new Date(year, mon, 1);
+      const result = await Order.deleteMany({ createdAt: { $gte: start, $lt: end } });
+      deleted = result.deletedCount;
+    } else if (count === 'all') {
       const result = await Order.deleteMany({});
       deleted = result.deletedCount;
     } else {
@@ -196,25 +203,41 @@ router.get('/stats', protect, restrictTo('admin'), async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [total, pending, inProgress, completed, revenue, totalRevenue] = await Promise.all([
+    const isBulkExpr = { $and: [{ $ne: [{ $ifNull: ['$bulk.customerName', ''] }, ''] }] };
+    const collectedExpr = {
+      $cond: {
+        if: isBulkExpr,
+        then: { $ifNull: ['$bulk.advance', 0] },
+        else: { $cond: { if: { $eq: ['$status', 'completed'] }, then: '$payableAmount', else: 0 } },
+      },
+    };
+
+    const [total, pending, inProgress, completed, revenue, deliveredBalToday, totalRev, totalDeliveredBal] = await Promise.all([
       Order.countDocuments({ createdAt: { $gte: today } }),
-      Order.countDocuments({ createdAt: { $gte: today }, status: 'pending' }),
-      Order.countDocuments({ createdAt: { $gte: today }, status: 'in-progress' }),
-      Order.countDocuments({ createdAt: { $gte: today }, status: 'completed' }),
+      Order.countDocuments({ createdAt: { $gte: today }, status: 'pending', 'bulk.customerName': { $in: [null, ''] } }),
+      Order.countDocuments({ createdAt: { $gte: today }, status: 'in-progress', 'bulk.customerName': { $in: [null, ''] } }),
+      Order.countDocuments({ createdAt: { $gte: today }, status: 'completed', 'bulk.customerName': { $in: [null, ''] } }),
       Order.aggregate([
-        { $match: { createdAt: { $gte: today }, status: 'completed' } },
-        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+        { $match: { createdAt: { $gte: today } } },
+        { $group: { _id: null, total: { $sum: collectedExpr } } },
       ]),
       Order.aggregate([
-        { $match: { status: 'completed' } },
-        { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+        { $match: { isDelivered: true, deliveredAt: { $gte: today }, 'bulk.customerName': { $ne: '' } } },
+        { $group: { _id: null, bal: { $sum: { $ifNull: ['$bulk.balance', 0] } } } },
+      ]),
+      Order.aggregate([
+        { $group: { _id: null, total: { $sum: collectedExpr } } },
+      ]),
+      Order.aggregate([
+        { $match: { isDelivered: true, 'bulk.customerName': { $ne: '' } } },
+        { $group: { _id: null, bal: { $sum: { $ifNull: ['$bulk.balance', 0] } } } },
       ]),
     ]);
 
     res.json({
       today: { total, pending, inProgress, completed },
-      revenue: revenue[0]?.total || 0,
-      totalRevenue: totalRevenue[0]?.total || 0,
+      revenue: +((revenue[0]?.total || 0) + (deliveredBalToday[0]?.bal || 0)).toFixed(2),
+      totalRevenue: +((totalRev[0]?.total || 0) + (totalDeliveredBal[0]?.bal || 0)).toFixed(2),
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -406,6 +429,16 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
     const { type = 'monthly', month, date } = req.query;
     const TZ = '+05:30';
 
+    // bulk order ka advance count karo creation day pe, balance count karo delivery day pe
+    const isBulk = { $and: [{ $ne: [{ $ifNull: ['$bulk.customerName', ''] }, ''] }] };
+    const collectedAmt = {
+      $cond: {
+        if: isBulk,
+        then: { $ifNull: ['$bulk.advance', 0] },
+        else: { $cond: { if: { $eq: ['$status', 'completed'] }, then: '$payableAmount', else: 0 } },
+      },
+    };
+
     // ── TODAY ──────────────────────────────────────────────────────
     if (type === 'today') {
       let dayStart, dayEnd;
@@ -417,10 +450,15 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
         dayEnd   = new Date(); dayEnd.setHours(23, 59, 59, 999);
       }
 
-      const [totals, items, peakHours] = await Promise.all([
+      const [totals, deliveredBalance, items, peakHours] = await Promise.all([
         Order.aggregate([
           { $match: { createdAt: { $gte: dayStart, $lte: dayEnd } } },
-          { $group: { _id: null, totalOrders: { $sum: 1 }, totalSales: { $sum: '$payableAmount' } } },
+          { $group: { _id: null, totalOrders: { $sum: 1 }, totalSales: { $sum: collectedAmt } } },
+        ]),
+        // balance collected today from bulk orders delivered today
+        Order.aggregate([
+          { $match: { isDelivered: true, deliveredAt: { $gte: dayStart, $lte: dayEnd }, 'bulk.customerName': { $ne: '' } } },
+          { $group: { _id: null, bal: { $sum: { $ifNull: ['$bulk.balance', 0] } } } },
         ]),
         Order.aggregate([
           { $match: { createdAt: { $gte: dayStart, $lte: dayEnd } } },
@@ -428,6 +466,8 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
           { $group: {
             _id: '$items.name',
             quantitySold: { $sum: '$items.quantity' },
+            unit: { $first: '$items.unit' },
+            quantityLabel: { $first: '$items.quantityLabel' },
             revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
           }},
           { $sort: { revenue: -1 } },
@@ -442,11 +482,13 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
         ]),
       ]);
 
+      const totalSales = +((totals[0]?.totalSales || 0) + (deliveredBalance[0]?.bal || 0)).toFixed(2);
+
       return res.json({
         type: 'today',
         totalOrders: totals[0]?.totalOrders || 0,
-        totalSales:  +(totals[0]?.totalSales  || 0).toFixed(2),
-        items: items.map(i => ({ name: i._id, quantitySold: i.quantitySold, revenue: +i.revenue.toFixed(2) })),
+        totalSales,
+        items: items.map(i => ({ name: i._id, quantitySold: i.quantitySold, unit: i.unit, quantityLabel: i.quantityLabel, revenue: +i.revenue.toFixed(2) })),
         peakHours: peakHours.map(h => ({ hour: h._id, count: h.count })),
       });
     }
@@ -465,10 +507,14 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
     const prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
     const prevEnd   = new Date(start);
 
-    const [totals, items, prevTotals] = await Promise.all([
+    const [totals, deliveredBalance, items, prevTotals, prevDeliveredBalance] = await Promise.all([
       Order.aggregate([
         { $match: { createdAt: { $gte: start, $lt: end } } },
-        { $group: { _id: null, totalOrders: { $sum: 1 }, totalRevenue: { $sum: '$payableAmount' } } },
+        { $group: { _id: null, totalOrders: { $sum: 1 }, totalRevenue: { $sum: collectedAmt } } },
+      ]),
+      Order.aggregate([
+        { $match: { isDelivered: true, deliveredAt: { $gte: start, $lt: end }, 'bulk.customerName': { $ne: '' } } },
+        { $group: { _id: null, bal: { $sum: { $ifNull: ['$bulk.balance', 0] } } } },
       ]),
       Order.aggregate([
         { $match: { createdAt: { $gte: start, $lt: end } } },
@@ -476,20 +522,26 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
         { $group: {
           _id: '$items.name',
           quantitySold: { $sum: '$items.quantity' },
+          unit: { $first: '$items.unit' },
+          quantityLabel: { $first: '$items.quantityLabel' },
           revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
         }},
         { $sort: { revenue: -1 } },
       ]),
       Order.aggregate([
         { $match: { createdAt: { $gte: prevStart, $lt: prevEnd } } },
-        { $group: { _id: null, totalOrders: { $sum: 1 }, totalRevenue: { $sum: '$payableAmount' } } },
+        { $group: { _id: null, totalOrders: { $sum: 1 }, totalRevenue: { $sum: collectedAmt } } },
+      ]),
+      Order.aggregate([
+        { $match: { isDelivered: true, deliveredAt: { $gte: prevStart, $lt: prevEnd }, 'bulk.customerName': { $ne: '' } } },
+        { $group: { _id: null, bal: { $sum: { $ifNull: ['$bulk.balance', 0] } } } },
       ]),
     ]);
 
     const totalOrders  = totals[0]?.totalOrders  || 0;
-    const totalRevenue = totals[0]?.totalRevenue  || 0;
+    const totalRevenue = +((totals[0]?.totalRevenue || 0) + (deliveredBalance[0]?.bal || 0)).toFixed(2);
     const prevOrders   = prevTotals[0]?.totalOrders  || 0;
-    const prevRevenue  = prevTotals[0]?.totalRevenue || 0;
+    const prevRevenue  = +((prevTotals[0]?.totalRevenue || 0) + (prevDeliveredBalance[0]?.bal || 0)).toFixed(2);
     const avgOrderValue     = totalOrders > 0 ? +(totalRevenue / totalOrders).toFixed(2) : 0;
     const prevAvgOrderValue = prevOrders  > 0 ? +(prevRevenue  / prevOrders ).toFixed(2) : 0;
     const growthPct = (curr, prev) => prev > 0 ? +(((curr - prev) / prev) * 100).toFixed(1) : null;
@@ -499,7 +551,7 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
       totalOrders,
       totalRevenue,
       avgOrderValue,
-      items: items.map(i => ({ name: i._id, quantitySold: i.quantitySold, revenue: +i.revenue.toFixed(2) })),
+      items: items.map(i => ({ name: i._id, quantitySold: i.quantitySold, unit: i.unit, quantityLabel: i.quantityLabel, revenue: +i.revenue.toFixed(2) })),
       growth: {
         revenue: growthPct(totalRevenue, prevRevenue),
         orders:  growthPct(totalOrders,  prevOrders),

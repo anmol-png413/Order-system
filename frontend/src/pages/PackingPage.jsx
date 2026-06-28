@@ -133,11 +133,12 @@ export default function PackingPage() {
     }
   };
 
-  const pending = orders.filter(o => o.status === 'pending');
-  const inProgress = orders.filter(o => o.status === 'in-progress');
-  const completed = orders.filter(o => o.status === 'completed');
+  const nonBulkOrders = orders.filter(o => !o.bulk?.customerName);
+  const pending = nonBulkOrders.filter(o => o.status === 'pending');
+  const inProgress = nonBulkOrders.filter(o => o.status === 'in-progress');
+  const completed = nonBulkOrders.filter(o => o.status === 'completed');
 
-  const displayed = filter === 'all' ? orders
+  const displayed = filter === 'all' ? nonBulkOrders
     : filter === 'new' ? pending
     : filter === 'packing' ? inProgress
     : completed;

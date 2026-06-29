@@ -932,8 +932,8 @@ export default function AdminPage() {
                           {new Date(order.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </span>
                         <span className="text-orange-400 text-xs font-semibold">₹{order.totalAmount?.toFixed(2)}</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[order.status]}`}>
-                          {order.status}
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${order.isDelivered ? 'bg-green-500/15 text-green-400' : STATUS_COLORS[order.status]}`}>
+                          {order.isDelivered ? 'delivered' : order.status}
                         </span>
                         {order.bulk?.phone && (
                           <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400">

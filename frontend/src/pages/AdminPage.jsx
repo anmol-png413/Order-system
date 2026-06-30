@@ -842,7 +842,8 @@ export default function AdminPage() {
         {tab === 'Orders' && (
           <div>
             {(() => {
-              const filteredOrders = orders.filter(o => o.createdAt?.slice(0, 7) === orderMonth);
+              const toISTMonth = (iso) => { const d = new Date(iso); d.setMinutes(d.getMinutes() + 330); return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}`; };
+              const filteredOrders = orders.filter(o => o.createdAt && toISTMonth(o.createdAt) === orderMonth);
               const monthLabel = new Date(orderMonth + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
               return (
             <>
@@ -931,7 +932,16 @@ export default function AdminPage() {
                           <Clock className="w-3 h-3" />
                           {new Date(order.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <span className="text-orange-400 text-xs font-semibold">₹{order.totalAmount?.toFixed(2)}</span>
+                        {order.discountPercent > 0 ? (
+                          <span className="text-xs font-semibold">
+                            <span className="text-zinc-500 line-through">₹{order.totalAmount?.toFixed(2)}</span>
+                            {' → '}
+                            <span className="text-orange-400">₹{order.payableAmount?.toFixed(2)}</span>
+                            <span className="text-green-400 ml-1">({order.discountPercent}% off)</span>
+                          </span>
+                        ) : (
+                          <span className="text-orange-400 text-xs font-semibold">₹{order.payableAmount?.toFixed(2)}</span>
+                        )}
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${order.isDelivered ? 'bg-green-500/15 text-green-400' : STATUS_COLORS[order.status]}`}>
                           {order.isDelivered ? 'delivered' : order.status}
                         </span>

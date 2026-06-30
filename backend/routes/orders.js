@@ -5,6 +5,33 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const { protect, restrictTo } = require('../middleware/auth');
 
+// "250g" -> 0.25, "1kg" -> 1, "0.5kg" -> 0.5; returns null if unparsable
+function parseWeightToKg(input) {
+  if (!input) return null;
+  const s = String(input).trim().toLowerCase().replace(/\s/g, '');
+  if (!s) return null;
+  if (s.endsWith('kg')) { const n = parseFloat(s); return isNaN(n) ? null : n; }
+  if (s.endsWith('g'))  { const n = parseFloat(s); return isNaN(n) ? null : n / 1000; }
+  const n = parseFloat(s);
+  if (isNaN(n)) return null;
+  return n < 10 ? n : n / 1000;
+}
+
+// Aggregated {_id, revenue, unit, entries:[{quantity, quantityLabel}]} -> {name, quantitySold, unit, revenue}
+function summarizeItems(rawItems) {
+  return rawItems.map(i => {
+    if (i.unit === 'piece') {
+      const totalPieces = i.entries.reduce((s, e) => s + (e.quantity || 0), 0);
+      return { name: i._id, quantitySold: totalPieces, unit: 'piece', revenue: +i.revenue.toFixed(2) };
+    }
+    const totalKg = i.entries.reduce((s, e) => {
+      const kgPerUnit = parseWeightToKg(e.quantityLabel);
+      return s + (kgPerUnit !== null ? kgPerUnit * (e.quantity || 0) : (e.quantity || 0));
+    }, 0);
+    return { name: i._id, quantitySold: +totalKg.toFixed(3), unit: i.unit, revenue: +i.revenue.toFixed(2) };
+  });
+}
+
 // GET /api/orders — filtered by role
 router.get('/', protect, async (req, res) => {
   try {
@@ -465,9 +492,8 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
           { $unwind: '$items' },
           { $group: {
             _id: '$items.name',
-            quantitySold: { $sum: '$items.quantity' },
             unit: { $first: '$items.unit' },
-            quantityLabel: { $first: '$items.quantityLabel' },
+            entries: { $push: { quantity: '$items.quantity', quantityLabel: '$items.quantityLabel' } },
             revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
           }},
           { $sort: { revenue: -1 } },
@@ -488,7 +514,7 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
         type: 'today',
         totalOrders: totals[0]?.totalOrders || 0,
         totalSales,
-        items: items.map(i => ({ name: i._id, quantitySold: i.quantitySold, unit: i.unit, quantityLabel: i.quantityLabel, revenue: +i.revenue.toFixed(2) })),
+        items: summarizeItems(items),
         peakHours: peakHours.map(h => ({ hour: h._id, count: h.count })),
       });
     }
@@ -521,9 +547,8 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
         { $unwind: '$items' },
         { $group: {
           _id: '$items.name',
-          quantitySold: { $sum: '$items.quantity' },
           unit: { $first: '$items.unit' },
-          quantityLabel: { $first: '$items.quantityLabel' },
+          entries: { $push: { quantity: '$items.quantity', quantityLabel: '$items.quantityLabel' } },
           revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
         }},
         { $sort: { revenue: -1 } },
@@ -551,7 +576,7 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
       totalOrders,
       totalRevenue,
       avgOrderValue,
-      items: items.map(i => ({ name: i._id, quantitySold: i.quantitySold, unit: i.unit, quantityLabel: i.quantityLabel, revenue: +i.revenue.toFixed(2) })),
+      items: summarizeItems(items),
       growth: {
         revenue: growthPct(totalRevenue, prevRevenue),
         orders:  growthPct(totalOrders,  prevOrders),

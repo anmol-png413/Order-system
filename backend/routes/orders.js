@@ -227,8 +227,10 @@ router.delete('/:id', protect, restrictTo('staff', 'admin'), async (req, res) =>
 // GET /api/orders/stats — Admin dashboard stats
 router.get('/stats', protect, restrictTo('admin'), async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // IST midnight in UTC (IST = UTC+5:30)
+    const IST_OFFSET = 330 * 60 * 1000;
+    const istNow = new Date(Date.now() + IST_OFFSET);
+    const today = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - IST_OFFSET);
 
     const isBulkExpr = { $and: [{ $ne: [{ $ifNull: ['$bulk.customerName', ''] }, ''] }] };
     const collectedExpr = {
@@ -468,13 +470,17 @@ router.get('/analytics', protect, restrictTo('admin'), async (req, res) => {
 
     // ── TODAY ──────────────────────────────────────────────────────
     if (type === 'today') {
+      const IST_OFFSET = 330 * 60 * 1000; // 5h30m in ms
       let dayStart, dayEnd;
       if (date) {
-        dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
-        dayEnd   = new Date(date); dayEnd.setHours(23, 59, 59, 999);
+        // date is "YYYY-MM-DD" in IST — convert to UTC range covering that IST day
+        const [y, m, d] = date.split('-').map(Number);
+        dayStart = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0) - IST_OFFSET);
+        dayEnd   = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999) - IST_OFFSET);
       } else {
-        dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
-        dayEnd   = new Date(); dayEnd.setHours(23, 59, 59, 999);
+        const istNow = new Date(Date.now() + IST_OFFSET);
+        dayStart = new Date(Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - IST_OFFSET);
+        dayEnd   = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
       }
 
       const [totals, deliveredBalance, items, peakHours] = await Promise.all([
